@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.peca.backend.exception.AcessoNegadoException;
 import com.peca.backend.exception.ConflitoException;
 import com.peca.backend.exception.RecursoNaoEncontradoException;
 import com.peca.backend.usuario.dto.UsuarioRequest;
@@ -90,7 +91,7 @@ class UsuarioServiceTest {
 		when(passwordEncoder.encode("senhaForte123")).thenReturn("hash-novo");
 		when(repository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
 
-		UsuarioResponse response = service.atualizar(id, request("maria@email.com"));
+		UsuarioResponse response = service.atualizar(id, request("maria@email.com"), id);
 
 		assertThat(response.id()).isEqualTo(id);
 		verify(repository, never()).existsByEmail(any());
@@ -102,7 +103,7 @@ class UsuarioServiceTest {
 		when(repository.findById(id)).thenReturn(Optional.of(usuarioExistente(id, "maria@email.com")));
 		when(repository.existsByEmail("outro@email.com")).thenReturn(true);
 
-		assertThatThrownBy(() -> service.atualizar(id, request("outro@email.com")))
+		assertThatThrownBy(() -> service.atualizar(id, request("outro@email.com"), id))
 				.isInstanceOf(ConflitoException.class);
 		verify(repository, never()).save(any());
 	}
@@ -112,8 +113,22 @@ class UsuarioServiceTest {
 		UUID id = UUID.randomUUID();
 		when(repository.findById(id)).thenReturn(Optional.empty());
 
-		assertThatThrownBy(() -> service.deletar(id))
+		assertThatThrownBy(() -> service.deletar(id, id))
 				.isInstanceOf(RecursoNaoEncontradoException.class);
+		verify(repository, never()).delete(any());
+	}
+
+	@Test
+	void atualizarDeveFalharQuandoUsuarioLogadoEhOutro() {
+		assertThatThrownBy(() -> service.atualizar(UUID.randomUUID(), request("maria@email.com"), UUID.randomUUID()))
+				.isInstanceOf(AcessoNegadoException.class);
+		verify(repository, never()).save(any());
+	}
+
+	@Test
+	void deletarDeveFalharQuandoUsuarioLogadoEhOutro() {
+		assertThatThrownBy(() -> service.deletar(UUID.randomUUID(), UUID.randomUUID()))
+				.isInstanceOf(AcessoNegadoException.class);
 		verify(repository, never()).delete(any());
 	}
 
