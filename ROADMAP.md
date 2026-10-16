@@ -15,9 +15,9 @@
 - [-] Criar CRUD de Usuários e configuração base de segurança. (Senha com hash BCrypt; autenticação JWT dos endpoints de escrita ainda não implementada.)
 
 ## Fase 3: Domínio de Anúncios (Peças)
-- [ ] Criar Entidade e DTOs de Peça (Título, Descrição, Preço, Categoria, Modelo de Celular, ID do Vendedor).
-- [ ] Criar endpoints de criação, edição e exclusão de anúncios.
-- [ ] Criar endpoint público de listagem de peças com filtros (por modelo e preço).
+- [-] Criar Entidade e DTOs de Peça (Título, Descrição, Preço, Categoria, Modelo de Celular, ID do Vendedor).
+- [-] Criar endpoints de criação, edição e exclusão de anúncios. (Vendedor identificado pelo `vendedorId` no corpo; sem JWT ainda, então não há proteção real de autoria.)
+- [-] Criar endpoint público de listagem de peças com filtros (por modelo e preço).
 
 ## Fase 4: Imagens
 - [ ] Integrar API do Supabase Storage para upload de imagens das peças.
