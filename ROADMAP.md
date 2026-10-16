@@ -20,5 +20,5 @@
 - [x] Criar endpoint público de listagem de peças com filtros (por modelo e preço).
 
 ## Fase 4: Imagens
-- [-] Integrar API do Supabase Storage para upload de imagens das peças.
-- [-] Salvar a URL pública da imagem na Entidade da Peça.
+- [x] Integrar API do Supabase Storage para upload de imagens das peças.
+- [x] Salvar a URL pública da imagem na Entidade da Peça.
