@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -50,8 +51,14 @@ public class SupabaseStorageService {
 					.body(bytes)
 					.retrieve()
 					.toBodilessEntity();
+		} catch (RestClientResponseException e) {
+			log.error("Supabase Storage recusou o upload de {}: HTTP {} {}", caminho, e.getStatusCode().value(),
+					e.getResponseBodyAsString());
+			throw new ArmazenamentoException("Falha ao enviar imagem para o Supabase Storage (HTTP "
+					+ e.getStatusCode().value() + "): " + e.getResponseBodyAsString(), e);
 		} catch (RestClientException e) {
-			throw new ArmazenamentoException("Falha ao enviar imagem para o Supabase Storage", e);
+			log.error("Erro de comunicacao com o Supabase Storage ao enviar {}", caminho, e);
+			throw new ArmazenamentoException("Falha ao conectar ao Supabase Storage: " + e.getMessage(), e);
 		}
 		return urlPublica(caminho);
 	}

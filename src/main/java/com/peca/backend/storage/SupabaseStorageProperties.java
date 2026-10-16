@@ -10,8 +10,12 @@ public record SupabaseStorageProperties(String url, String serviceKey, String bu
 				&& bucket != null && !bucket.isBlank();
 	}
 
+	/**
+	 * URL raiz do projeto. Tolera barra final e sufixos de API copiados por engano do painel
+	 * (ex: {@code https://<ref>.supabase.co/rest/v1/}).
+	 */
 	public String urlBase() {
-		return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+		return url.trim().replaceAll("/+$", "").replaceAll("/(rest|storage)/v1$", "");
 	}
 
 }

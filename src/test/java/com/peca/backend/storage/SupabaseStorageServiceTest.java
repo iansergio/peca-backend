@@ -6,11 +6,13 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -63,11 +65,30 @@ class SupabaseStorageServiceTest {
 	}
 
 	@Test
-	void enviarImagemDeveConverterErroDoSupabase() {
-		server.expect(method(HttpMethod.POST)).andRespond(withServerError());
+	void enviarImagemDeveIncluirStatusEMensagemDoSupabaseNoErro() {
+		server.expect(method(HttpMethod.POST))
+				.andRespond(withStatus(HttpStatus.NOT_FOUND).body("{\"message\":\"Bucket not found\"}"));
 
 		assertThatThrownBy(() -> service.enviarImagem("peca-1", new MockMultipartFile("arquivo", PNG)))
-				.isInstanceOf(ArmazenamentoException.class);
+				.isInstanceOf(ArmazenamentoException.class)
+				.hasMessageContaining("HTTP 404")
+				.hasMessageContaining("Bucket not found");
+	}
+
+	@Test
+	void enviarImagemDeveIgnorarSufixoDeApiNaUrlConfigurada() {
+		RestClient.Builder builder = RestClient.builder();
+		MockRestServiceServer servidor = MockRestServiceServer.bindTo(builder).build();
+		SupabaseStorageService comSufixo = new SupabaseStorageService(builder.build(),
+				new SupabaseStorageProperties(URL + "/rest/v1/", "chave-secreta", "pecas"));
+		servidor.expect(request -> assertThat(request.getURI().toString())
+						.startsWith(URL + "/storage/v1/object/pecas/peca-1/"))
+				.andRespond(withSuccess());
+
+		String url = comSufixo.enviarImagem("peca-1", new MockMultipartFile("arquivo", PNG));
+
+		assertThat(url).startsWith(URL + "/storage/v1/object/public/pecas/peca-1/");
+		servidor.verify();
 	}
 
 	@Test
