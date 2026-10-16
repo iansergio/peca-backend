@@ -36,6 +36,9 @@ public class Peca {
 	@Column(name = "modelo_celular", nullable = false, length = 80)
 	private String modeloCelular;
 
+	@Column(name = "imagem_url", length = 500)
+	private String imagemUrl;
+
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "vendedor_id", nullable = false)
 	private Usuario vendedor;
@@ -86,6 +89,14 @@ public class Peca {
 
 	public void setModeloCelular(String modeloCelular) {
 		this.modeloCelular = modeloCelular;
+	}
+
+	public String getImagemUrl() {
+		return imagemUrl;
+	}
+
+	public void setImagemUrl(String imagemUrl) {
+		this.imagemUrl = imagemUrl;
 	}
 
 	public Usuario getVendedor() {

@@ -11,6 +11,7 @@ import com.peca.backend.exception.AcessoNegadoException;
 import com.peca.backend.exception.RecursoNaoEncontradoException;
 import com.peca.backend.peca.dto.PecaRequest;
 import com.peca.backend.peca.dto.PecaResponse;
+import com.peca.backend.storage.SupabaseStorageService;
 import com.peca.backend.usuario.Usuario;
 import com.peca.backend.usuario.UsuarioRepository;
 import java.math.BigDecimal;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 
 @ExtendWith(MockitoExtension.class)
 class PecaServiceTest {
@@ -31,11 +33,14 @@ class PecaServiceTest {
 	@Mock
 	private UsuarioRepository usuarioRepository;
 
+	@Mock
+	private SupabaseStorageService storageService;
+
 	private PecaService service;
 
 	@BeforeEach
 	void setUp() {
-		service = new PecaService(repository, usuarioRepository);
+		service = new PecaService(repository, usuarioRepository, storageService);
 	}
 
 	private static Usuario vendedor(UUID id) {
@@ -108,6 +113,32 @@ class PecaServiceTest {
 		assertThatThrownBy(() -> service.atualizar(id, request(UUID.randomUUID())))
 				.isInstanceOf(AcessoNegadoException.class);
 		verify(repository, never()).save(any());
+	}
+
+	@Test
+	void enviarImagemDeveSalvarUrlERemoverImagemAnterior() {
+		UUID id = UUID.randomUUID();
+		Peca peca = pecaExistente(id, vendedor(UUID.randomUUID()));
+		peca.setImagemUrl("https://x.supabase.co/storage/v1/object/public/pecas/antiga.png");
+		MockMultipartFile arquivo = new MockMultipartFile("arquivo", "foto.png", "image/png", new byte[] {1});
+		when(repository.findById(id)).thenReturn(Optional.of(peca));
+		when(storageService.enviarImagem(id.toString(), arquivo)).thenReturn("https://x.supabase.co/nova.png");
+		when(repository.save(any(Peca.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		PecaResponse response = service.enviarImagem(id, arquivo);
+
+		assertThat(response.imagemUrl()).isEqualTo("https://x.supabase.co/nova.png");
+		verify(storageService).removerPorUrl("https://x.supabase.co/storage/v1/object/public/pecas/antiga.png");
+	}
+
+	@Test
+	void enviarImagemDeveFalharSemUploadQuandoPecaNaoExiste() {
+		UUID id = UUID.randomUUID();
+		when(repository.findById(id)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.enviarImagem(id, new MockMultipartFile("arquivo", new byte[] {1})))
+				.isInstanceOf(RecursoNaoEncontradoException.class);
+		verify(storageService, never()).enviarImagem(any(), any());
 	}
 
 	@Test

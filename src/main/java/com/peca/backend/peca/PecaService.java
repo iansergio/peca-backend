@@ -4,6 +4,7 @@ import com.peca.backend.exception.AcessoNegadoException;
 import com.peca.backend.exception.RecursoNaoEncontradoException;
 import com.peca.backend.peca.dto.PecaRequest;
 import com.peca.backend.peca.dto.PecaResponse;
+import com.peca.backend.storage.SupabaseStorageService;
 import com.peca.backend.usuario.Usuario;
 import com.peca.backend.usuario.UsuarioRepository;
 import java.math.BigDecimal;
@@ -12,16 +13,20 @@ import java.util.UUID;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class PecaService {
 
 	private final PecaRepository repository;
 	private final UsuarioRepository usuarioRepository;
+	private final SupabaseStorageService storageService;
 
-	public PecaService(PecaRepository repository, UsuarioRepository usuarioRepository) {
+	public PecaService(PecaRepository repository, UsuarioRepository usuarioRepository,
+			SupabaseStorageService storageService) {
 		this.repository = repository;
 		this.usuarioRepository = usuarioRepository;
+		this.storageService = storageService;
 	}
 
 	@Transactional
@@ -59,8 +64,20 @@ public class PecaService {
 	}
 
 	@Transactional
+	public PecaResponse enviarImagem(UUID id, MultipartFile arquivo) {
+		Peca peca = buscarEntidade(id);
+		String imagemAnterior = peca.getImagemUrl();
+		peca.setImagemUrl(storageService.enviarImagem(id.toString(), arquivo));
+		PecaResponse response = PecaResponse.from(repository.save(peca));
+		storageService.removerPorUrl(imagemAnterior);
+		return response;
+	}
+
+	@Transactional
 	public void deletar(UUID id) {
-		repository.delete(buscarEntidade(id));
+		Peca peca = buscarEntidade(id);
+		repository.delete(peca);
+		storageService.removerPorUrl(peca.getImagemUrl());
 	}
 
 	private Peca buscarEntidade(UUID id) {
