@@ -6,8 +6,8 @@
 - [x] Testado pelo humano e aprovado[cite: 2].
 
 ## Fase 1: Setup e Infraestrutura
-- [ ] Inicializar projeto Spring Boot 4.1 com Java 25 LTS.
-- [ ] Configurar conexão com o banco de dados Supabase (PostgreSQL).
+- [-] Inicializar projeto Spring Boot 4.1 com Java 25 LTS.
+- [-] Configurar conexão com o banco de dados Supabase (PostgreSQL).
 - [ ] Configurar o Swagger/OpenAPI para documentação (acessível via `/swagger-ui.html`).
 
 ## Fase 2: Domínio de Usuários
