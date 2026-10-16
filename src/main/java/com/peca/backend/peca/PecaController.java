@@ -4,6 +4,8 @@ import com.peca.backend.peca.dto.PecaRequest;
 import com.peca.backend.peca.dto.PecaResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Encoding;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -11,6 +13,7 @@ import java.math.BigDecimal;
 import java.net.URI;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/pecas")
@@ -72,6 +76,23 @@ public class PecaController {
 	public PecaResponse atualizar(@Parameter(description = "Id do anuncio") @PathVariable UUID id,
 			@Valid @RequestBody PecaRequest request) {
 		return service.atualizar(id, request);
+	}
+
+	@PostMapping(path = "/{id}/imagem", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	@Operation(summary = "Envia a imagem de um anuncio",
+			description = "Faz upload para o Supabase Storage e salva a URL publica em imagemUrl. "
+					+ "Substitui a imagem anterior, se houver. Formatos: JPEG, PNG ou WEBP, ate 5 MB.",
+			requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(
+					mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
+					encoding = @Encoding(name = "arquivo", contentType = "image/jpeg, image/png, image/webp"))))
+	@ApiResponse(responseCode = "200", description = "Imagem enviada; retorna o anuncio com imagemUrl")
+	@ApiResponse(responseCode = "400", description = "Arquivo ausente ou formato nao suportado")
+	@ApiResponse(responseCode = "404", description = "Anuncio nao encontrado")
+	@ApiResponse(responseCode = "413", description = "Arquivo maior que o limite")
+	@ApiResponse(responseCode = "502", description = "Falha no Supabase Storage")
+	public PecaResponse enviarImagem(@Parameter(description = "Id do anuncio") @PathVariable UUID id,
+			@Parameter(description = "Arquivo de imagem") @RequestParam("arquivo") MultipartFile arquivo) {
+		return service.enviarImagem(id, arquivo);
 	}
 
 	@DeleteMapping("/{id}")

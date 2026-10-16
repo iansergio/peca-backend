@@ -38,4 +38,13 @@ class OpenApiDocsTests {
 				.andExpect(jsonPath("$.components.schemas.VendedorResponse.properties.email").doesNotExist());
 	}
 
+	@Test
+	void apiDocsDeveDocumentarUploadDeImagemComoMultipart() throws Exception {
+		String schema = "$.paths['/api/pecas/{id}/imagem'].post.requestBody.content['multipart/form-data'].schema";
+		mockMvc.perform(get("/v3/api-docs"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath(schema + ".properties.arquivo.format").value("binary"))
+				.andExpect(jsonPath("$.components.schemas.PecaResponse.properties.imagemUrl").exists());
+	}
+
 }
