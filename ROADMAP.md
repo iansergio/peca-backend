@@ -8,11 +8,11 @@
 ## Fase 1: Setup e Infraestrutura
 - [-] Inicializar projeto Spring Boot 4.1 com Java 25 LTS.
 - [-] Configurar conexão com o banco de dados Supabase (PostgreSQL).
-- [ ] Configurar o Swagger/OpenAPI para documentação (acessível via `/swagger-ui.html`).
+- [-] Configurar o Swagger/OpenAPI para documentação (acessível via `/swagger-ui.html`).
 
 ## Fase 2: Domínio de Usuários
-- [ ] Criar Entidade e DTOs de Usuário (Nome, Email, Senha, WhatsApp).
-- [ ] Criar CRUD de Usuários e configuração base de segurança.
+- [-] Criar Entidade e DTOs de Usuário (Nome, Email, Senha, WhatsApp).
+- [-] Criar CRUD de Usuários e configuração base de segurança. (Senha com hash BCrypt; autenticação JWT dos endpoints de escrita ainda não implementada.)
 
 ## Fase 3: Domínio de Anúncios (Peças)
 - [ ] Criar Entidade e DTOs de Peça (Título, Descrição, Preço, Categoria, Modelo de Celular, ID do Vendedor).
