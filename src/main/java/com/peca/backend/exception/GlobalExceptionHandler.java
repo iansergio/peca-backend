@@ -1,6 +1,7 @@
 package com.peca.backend.exception;
 
 import java.util.stream.Collectors;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -18,6 +19,17 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(ConflitoException.class)
 	public ProblemDetail handleConflito(ConflitoException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+	}
+
+	@ExceptionHandler(AcessoNegadoException.class)
+	public ProblemDetail handleAcessoNegado(AcessoNegadoException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+	}
+
+	@ExceptionHandler(DataIntegrityViolationException.class)
+	public ProblemDetail handleIntegridade(DataIntegrityViolationException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+				"Operacao viola uma restricao de integridade (ex: usuario com anuncios vinculados)");
 	}
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)

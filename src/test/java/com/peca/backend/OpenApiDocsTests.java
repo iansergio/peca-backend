@@ -26,4 +26,16 @@ class OpenApiDocsTests {
 				.andExpect(jsonPath("$.components.schemas.UsuarioResponse.properties.senha").doesNotExist());
 	}
 
+	@Test
+	void apiDocsDeveExporEndpointsDePecas() throws Exception {
+		mockMvc.perform(get("/v3/api-docs"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.paths['/api/pecas'].get").exists())
+				.andExpect(jsonPath("$.paths['/api/pecas'].post").exists())
+				.andExpect(jsonPath("$.paths['/api/pecas/{id}'].put").exists())
+				.andExpect(jsonPath("$.paths['/api/pecas/{id}'].delete").exists())
+				.andExpect(jsonPath("$.components.schemas.VendedorResponse.properties.senha").doesNotExist())
+				.andExpect(jsonPath("$.components.schemas.VendedorResponse.properties.email").doesNotExist());
+	}
+
 }
