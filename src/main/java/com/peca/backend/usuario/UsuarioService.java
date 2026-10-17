@@ -1,5 +1,6 @@
 package com.peca.backend.usuario;
 
+import com.peca.backend.exception.AcessoNegadoException;
 import com.peca.backend.exception.ConflitoException;
 import com.peca.backend.exception.RecursoNaoEncontradoException;
 import com.peca.backend.usuario.dto.UsuarioRequest;
@@ -43,7 +44,8 @@ public class UsuarioService {
 	}
 
 	@Transactional
-	public UsuarioResponse atualizar(UUID id, UsuarioRequest request) {
+	public UsuarioResponse atualizar(UUID id, UsuarioRequest request, UUID usuarioLogadoId) {
+		exigirProprioUsuario(id, usuarioLogadoId);
 		Usuario usuario = buscarEntidade(id);
 		String email = normalizarEmail(request.email());
 		if (!email.equals(usuario.getEmail()) && repository.existsByEmail(email)) {
@@ -54,8 +56,15 @@ public class UsuarioService {
 	}
 
 	@Transactional
-	public void deletar(UUID id) {
+	public void deletar(UUID id, UUID usuarioLogadoId) {
+		exigirProprioUsuario(id, usuarioLogadoId);
 		repository.delete(buscarEntidade(id));
+	}
+
+	private static void exigirProprioUsuario(UUID id, UUID usuarioLogadoId) {
+		if (!id.equals(usuarioLogadoId)) {
+			throw new AcessoNegadoException("Voce so pode alterar a sua propria conta");
+		}
 	}
 
 	private Usuario buscarEntidade(UUID id) {

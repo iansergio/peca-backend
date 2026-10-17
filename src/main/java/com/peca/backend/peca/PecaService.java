@@ -30,9 +30,9 @@ public class PecaService {
 	}
 
 	@Transactional
-	public PecaResponse criar(PecaRequest request) {
-		Usuario vendedor = usuarioRepository.findById(request.vendedorId())
-				.orElseThrow(() -> new RecursoNaoEncontradoException("Vendedor nao encontrado: " + request.vendedorId()));
+	public PecaResponse criar(PecaRequest request, UUID vendedorId) {
+		Usuario vendedor = usuarioRepository.findById(vendedorId)
+				.orElseThrow(() -> new RecursoNaoEncontradoException("Vendedor nao encontrado: " + vendedorId));
 		Peca peca = new Peca();
 		peca.setVendedor(vendedor);
 		aplicar(peca, request);
@@ -53,19 +53,15 @@ public class PecaService {
 	}
 
 	@Transactional
-	public PecaResponse atualizar(UUID id, PecaRequest request) {
-		Peca peca = buscarEntidade(id);
-		// Sem JWT ainda, o vendedor e identificado pelo vendedorId do corpo.
-		if (!peca.getVendedor().getId().equals(request.vendedorId())) {
-			throw new AcessoNegadoException("Somente o vendedor do anuncio pode edita-lo");
-		}
+	public PecaResponse atualizar(UUID id, PecaRequest request, UUID usuarioLogadoId) {
+		Peca peca = buscarDoVendedor(id, usuarioLogadoId);
 		aplicar(peca, request);
 		return PecaResponse.from(repository.save(peca));
 	}
 
 	@Transactional
-	public PecaResponse enviarImagem(UUID id, MultipartFile arquivo) {
-		Peca peca = buscarEntidade(id);
+	public PecaResponse enviarImagem(UUID id, MultipartFile arquivo, UUID usuarioLogadoId) {
+		Peca peca = buscarDoVendedor(id, usuarioLogadoId);
 		String imagemAnterior = peca.getImagemUrl();
 		peca.setImagemUrl(storageService.enviarImagem(id.toString(), arquivo));
 		PecaResponse response = PecaResponse.from(repository.save(peca));
@@ -74,10 +70,18 @@ public class PecaService {
 	}
 
 	@Transactional
-	public void deletar(UUID id) {
-		Peca peca = buscarEntidade(id);
+	public void deletar(UUID id, UUID usuarioLogadoId) {
+		Peca peca = buscarDoVendedor(id, usuarioLogadoId);
 		repository.delete(peca);
 		storageService.removerPorUrl(peca.getImagemUrl());
+	}
+
+	private Peca buscarDoVendedor(UUID id, UUID usuarioLogadoId) {
+		Peca peca = buscarEntidade(id);
+		if (!peca.getVendedor().getId().equals(usuarioLogadoId)) {
+			throw new AcessoNegadoException("Somente o vendedor do anuncio pode altera-lo");
+		}
+		return peca;
 	}
 
 	private Peca buscarEntidade(UUID id) {

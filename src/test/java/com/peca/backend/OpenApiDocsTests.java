@@ -47,4 +47,15 @@ class OpenApiDocsTests {
 				.andExpect(jsonPath("$.components.schemas.PecaResponse.properties.imagemUrl").exists());
 	}
 
+	@Test
+	void apiDocsDeveDocumentarAutenticacaoBearer() throws Exception {
+		mockMvc.perform(get("/v3/api-docs"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"))
+				.andExpect(jsonPath("$.paths['/api/pecas'].post.security[0].bearerAuth").exists())
+				.andExpect(jsonPath("$.paths['/api/pecas'].get.security").doesNotExist())
+				.andExpect(jsonPath("$.paths['/api/auth/login'].post").exists())
+				.andExpect(jsonPath("$.components.schemas.PecaRequest.properties.vendedorId").doesNotExist());
+	}
+
 }

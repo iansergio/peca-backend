@@ -53,8 +53,8 @@ class PecaServiceTest {
 		return usuario;
 	}
 
-	private static PecaRequest request(UUID vendedorId) {
-		return new PecaRequest(" Tela iPhone 13 ", "Original", new BigDecimal("450.00"), "Tela", "iPhone 13", vendedorId);
+	private static PecaRequest request() {
+		return new PecaRequest(" Tela iPhone 13 ", "Original", new BigDecimal("450.00"), "Tela", "iPhone 13");
 	}
 
 	private static Peca pecaExistente(UUID id, Usuario vendedor) {
@@ -74,7 +74,7 @@ class PecaServiceTest {
 		when(usuarioRepository.findById(vendedorId)).thenReturn(Optional.of(vendedor(vendedorId)));
 		when(repository.save(any(Peca.class))).thenAnswer(inv -> inv.getArgument(0));
 
-		PecaResponse response = service.criar(request(vendedorId));
+		PecaResponse response = service.criar(request(), vendedorId);
 
 		assertThat(response.titulo()).isEqualTo("Tela iPhone 13");
 		assertThat(response.vendedor().id()).isEqualTo(vendedorId);
@@ -87,7 +87,7 @@ class PecaServiceTest {
 		UUID vendedorId = UUID.randomUUID();
 		when(usuarioRepository.findById(vendedorId)).thenReturn(Optional.empty());
 
-		assertThatThrownBy(() -> service.criar(request(vendedorId)))
+		assertThatThrownBy(() -> service.criar(request(), vendedorId))
 				.isInstanceOf(RecursoNaoEncontradoException.class);
 		verify(repository, never()).save(any());
 	}
@@ -99,7 +99,7 @@ class PecaServiceTest {
 		when(repository.findById(id)).thenReturn(Optional.of(pecaExistente(id, vendedor(vendedorId))));
 		when(repository.save(any(Peca.class))).thenAnswer(inv -> inv.getArgument(0));
 
-		PecaResponse response = service.atualizar(id, request(vendedorId));
+		PecaResponse response = service.atualizar(id, request(), vendedorId);
 
 		assertThat(response.modeloCelular()).isEqualTo("iPhone 13");
 		assertThat(response.preco()).isEqualByComparingTo("450.00");
@@ -110,7 +110,7 @@ class PecaServiceTest {
 		UUID id = UUID.randomUUID();
 		when(repository.findById(id)).thenReturn(Optional.of(pecaExistente(id, vendedor(UUID.randomUUID()))));
 
-		assertThatThrownBy(() -> service.atualizar(id, request(UUID.randomUUID())))
+		assertThatThrownBy(() -> service.atualizar(id, request(), UUID.randomUUID()))
 				.isInstanceOf(AcessoNegadoException.class);
 		verify(repository, never()).save(any());
 	}
@@ -118,14 +118,15 @@ class PecaServiceTest {
 	@Test
 	void enviarImagemDeveSalvarUrlERemoverImagemAnterior() {
 		UUID id = UUID.randomUUID();
-		Peca peca = pecaExistente(id, vendedor(UUID.randomUUID()));
+		UUID vendedorId = UUID.randomUUID();
+		Peca peca = pecaExistente(id, vendedor(vendedorId));
 		peca.setImagemUrl("https://x.supabase.co/storage/v1/object/public/pecas/antiga.png");
 		MockMultipartFile arquivo = new MockMultipartFile("arquivo", "foto.png", "image/png", new byte[] {1});
 		when(repository.findById(id)).thenReturn(Optional.of(peca));
 		when(storageService.enviarImagem(id.toString(), arquivo)).thenReturn("https://x.supabase.co/nova.png");
 		when(repository.save(any(Peca.class))).thenAnswer(inv -> inv.getArgument(0));
 
-		PecaResponse response = service.enviarImagem(id, arquivo);
+		PecaResponse response = service.enviarImagem(id, arquivo, vendedorId);
 
 		assertThat(response.imagemUrl()).isEqualTo("https://x.supabase.co/nova.png");
 		verify(storageService).removerPorUrl("https://x.supabase.co/storage/v1/object/public/pecas/antiga.png");
@@ -136,9 +137,29 @@ class PecaServiceTest {
 		UUID id = UUID.randomUUID();
 		when(repository.findById(id)).thenReturn(Optional.empty());
 
-		assertThatThrownBy(() -> service.enviarImagem(id, new MockMultipartFile("arquivo", new byte[] {1})))
+		assertThatThrownBy(() -> service.enviarImagem(id, new MockMultipartFile("arquivo", new byte[] {1}), UUID.randomUUID()))
 				.isInstanceOf(RecursoNaoEncontradoException.class);
 		verify(storageService, never()).enviarImagem(any(), any());
+	}
+
+	@Test
+	void enviarImagemDeveFalharSemUploadQuandoVendedorEhOutro() {
+		UUID id = UUID.randomUUID();
+		when(repository.findById(id)).thenReturn(Optional.of(pecaExistente(id, vendedor(UUID.randomUUID()))));
+
+		assertThatThrownBy(() -> service.enviarImagem(id, new MockMultipartFile("arquivo", new byte[] {1}), UUID.randomUUID()))
+				.isInstanceOf(AcessoNegadoException.class);
+		verify(storageService, never()).enviarImagem(any(), any());
+	}
+
+	@Test
+	void deletarDeveFalharQuandoVendedorEhOutro() {
+		UUID id = UUID.randomUUID();
+		when(repository.findById(id)).thenReturn(Optional.of(pecaExistente(id, vendedor(UUID.randomUUID()))));
+
+		assertThatThrownBy(() -> service.deletar(id, UUID.randomUUID()))
+				.isInstanceOf(AcessoNegadoException.class);
+		verify(repository, never()).delete(any(Peca.class));
 	}
 
 	@Test
@@ -146,7 +167,7 @@ class PecaServiceTest {
 		UUID id = UUID.randomUUID();
 		when(repository.findById(id)).thenReturn(Optional.empty());
 
-		assertThatThrownBy(() -> service.deletar(id))
+		assertThatThrownBy(() -> service.deletar(id, UUID.randomUUID()))
 				.isInstanceOf(RecursoNaoEncontradoException.class);
 		verify(repository, never()).delete(any(Peca.class));
 	}

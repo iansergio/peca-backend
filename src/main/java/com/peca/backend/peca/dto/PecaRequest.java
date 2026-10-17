@@ -7,7 +7,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
-import java.util.UUID;
 
 @Schema(description = "Dados para criar ou atualizar um anuncio de peca")
 public record PecaRequest(
@@ -29,10 +28,5 @@ public record PecaRequest(
 
 		@Schema(description = "Modelo de celular compativel", example = "iPhone 13")
 		@NotBlank @Size(max = 80)
-		String modeloCelular,
-
-		@Schema(description = "Id do usuario vendedor. Na edicao deve ser o mesmo vendedor do anuncio.",
-				example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
-		@NotNull
-		UUID vendedorId) {
+		String modeloCelular) {
 }
