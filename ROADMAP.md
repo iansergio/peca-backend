@@ -24,6 +24,6 @@
 - [x] Salvar a URL pública da imagem na Entidade da Peça.
 
 ## Fase 5: Autenticação JWT
-- [-] Criar endpoint de login (`POST /api/auth/login`) que emite token JWT.
-- [-] Proteger endpoints de escrita com JWT (cadastro de usuário e leitura de peças continuam públicos).
-- [-] Usar o usuário do token como vendedor e restringir edição/exclusão/upload ao próprio dono.
+- [x] Criar endpoint de login (`POST /api/auth/login`) que emite token JWT.
+- [x] Proteger endpoints de escrita com JWT (cadastro de usuário e leitura de peças continuam públicos).
+- [x] Usar o usuário do token como vendedor e restringir edição/exclusão/upload ao próprio dono.
