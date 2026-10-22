@@ -26,7 +26,8 @@
 
 ## Fase 5: Autenticação (Passwordless OTP + JWT)
 - [-] Criar a entidade `CodigoVerificacao` (código OTP de 6 dígitos vinculado ao email, com expiração).
-- [-] Criar endpoint para solicitar código OTP por email (`POST /api/auth/solicitar-codigo`, cria o usuário se ele ainda não existir; envio simulado no console).
+- [-] Criar endpoint para solicitar código OTP por email (`POST /api/auth/solicitar-codigo`, cria o usuário se ele ainda não existir).
+- [-] Enviar o código OTP por email real via SMTP (`spring-boot-starter-mail` + `EmailService`), substituindo a simulação no console. Credenciais via `MAIL_*` no `.env`.
 - [-] Criar endpoint para validar o código OTP e emitir o token JWT (`POST /api/auth/verificar-codigo`).
 - [-] Remover o endpoint de login com senha (`POST /api/auth/login`).
 - [-] Proteger endpoints de escrita com JWT (apenas os endpoints de OTP e a leitura de peças são públicos).
