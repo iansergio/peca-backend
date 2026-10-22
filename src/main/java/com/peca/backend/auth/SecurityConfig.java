@@ -12,8 +12,6 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -34,7 +32,7 @@ public class SecurityConfig {
 				.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/error").permitAll()
-						.requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/usuarios").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/auth/solicitar-codigo", "/api/auth/verificar-codigo", "/api/usuarios").permitAll()
 						.requestMatchers(HttpMethod.GET, "/api/pecas", "/api/pecas/*").permitAll()
 						.anyRequest().authenticated())
 				.oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()))
@@ -59,11 +57,6 @@ public class SecurityConfig {
 	@Bean
 	public JwtDecoder jwtDecoder(SecretKey jwtSecretKey) {
 		return NimbusJwtDecoder.withSecretKey(jwtSecretKey).macAlgorithm(MacAlgorithm.HS256).build();
-	}
-
-	@Bean
-	public PasswordEncoder passwordEncoder() {
-		return new BCryptPasswordEncoder();
 	}
 
 }

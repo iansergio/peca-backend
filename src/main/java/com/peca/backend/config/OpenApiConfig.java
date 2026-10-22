@@ -23,7 +23,7 @@ public class OpenApiConfig {
 						.type(SecurityScheme.Type.HTTP)
 						.scheme("bearer")
 						.bearerFormat("JWT")
-						.description("Token obtido em POST /api/auth/login")));
+						.description("Token obtido em POST /api/auth/verificar-codigo")));
 	}
 
 }

@@ -4,7 +4,7 @@ import com.peca.backend.usuario.Usuario;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
 
-@Schema(description = "Dados publicos do vendedor (sem email ou senha)")
+@Schema(description = "Dados publicos do vendedor (sem email)")
 public record VendedorResponse(
 		@Schema(example = "3fa85f64-5717-4562-b3fc-2c963f66afa6") UUID id,
 		@Schema(example = "Maria Silva") String nome,

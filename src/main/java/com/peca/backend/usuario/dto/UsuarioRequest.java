@@ -16,11 +16,6 @@ public record UsuarioRequest(
 		@NotBlank @Email @Size(max = 160)
 		String email,
 
-		@Schema(description = "Senha (minimo 8 caracteres)", example = "senhaForte123",
-				accessMode = Schema.AccessMode.WRITE_ONLY)
-		@NotBlank @Size(min = 8, max = 72)
-		String senha,
-
 		@Schema(description = "WhatsApp com DDD, apenas digitos", example = "11999998888")
 		@Pattern(regexp = "\\d{10,13}", message = "deve conter de 10 a 13 digitos")
 		String whatsapp) {

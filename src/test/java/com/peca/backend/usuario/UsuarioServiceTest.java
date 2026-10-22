@@ -20,7 +20,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class UsuarioServiceTest {
@@ -28,18 +27,15 @@ class UsuarioServiceTest {
 	@Mock
 	private UsuarioRepository repository;
 
-	@Mock
-	private PasswordEncoder passwordEncoder;
-
 	private UsuarioService service;
 
 	@BeforeEach
 	void setUp() {
-		service = new UsuarioService(repository, passwordEncoder);
+		service = new UsuarioService(repository);
 	}
 
 	private static UsuarioRequest request(String email) {
-		return new UsuarioRequest("Maria Silva", email, "senhaForte123", "11999998888");
+		return new UsuarioRequest("Maria Silva", email, "11999998888");
 	}
 
 	private static Usuario usuarioExistente(UUID id, String email) {
@@ -47,21 +43,18 @@ class UsuarioServiceTest {
 		usuario.setId(id);
 		usuario.setNome("Maria Silva");
 		usuario.setEmail(email);
-		usuario.setSenha("hash-antigo");
 		return usuario;
 	}
 
 	@Test
-	void criarDeveSalvarSenhaComHashENormalizarEmail() {
+	void criarDeveNormalizarEmail() {
 		when(repository.existsByEmail("maria@email.com")).thenReturn(false);
-		when(passwordEncoder.encode("senhaForte123")).thenReturn("hash");
 		when(repository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
 
 		UsuarioResponse response = service.criar(request("  Maria@Email.com "));
 
 		ArgumentCaptor<Usuario> captor = ArgumentCaptor.forClass(Usuario.class);
 		verify(repository).save(captor.capture());
-		assertThat(captor.getValue().getSenha()).isEqualTo("hash");
 		assertThat(captor.getValue().getEmail()).isEqualTo("maria@email.com");
 		assertThat(response.email()).isEqualTo("maria@email.com");
 	}
@@ -88,7 +81,6 @@ class UsuarioServiceTest {
 	void atualizarDevePermitirManterOProprioEmail() {
 		UUID id = UUID.randomUUID();
 		when(repository.findById(id)).thenReturn(Optional.of(usuarioExistente(id, "maria@email.com")));
-		when(passwordEncoder.encode("senhaForte123")).thenReturn("hash-novo");
 		when(repository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
 
 		UsuarioResponse response = service.atualizar(id, request("maria@email.com"), id);

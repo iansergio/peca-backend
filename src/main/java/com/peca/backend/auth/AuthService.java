@@ -1,15 +1,21 @@
 package com.peca.backend.auth;
 
-import com.peca.backend.auth.dto.LoginRequest;
+import com.peca.backend.auth.dto.SolicitarCodigoRequest;
+import com.peca.backend.auth.dto.SolicitarCodigoResponse;
 import com.peca.backend.auth.dto.TokenResponse;
+import com.peca.backend.auth.dto.VerificarCodigoRequest;
 import com.peca.backend.usuario.Usuario;
 import com.peca.backend.usuario.UsuarioRepository;
+import com.peca.backend.usuario.UsuarioService;
+import com.peca.backend.usuario.dto.UsuarioResponse;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
-import java.util.Optional;
-import java.util.UUID;
+import java.time.LocalDateTime;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -21,39 +27,99 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuthService {
 
+	static final Duration VALIDADE_CODIGO = Duration.ofMinutes(10);
+	static final int MAX_TENTATIVAS = 5;
+	private static final int TAMANHO_MAXIMO_NOME = 120;
+
 	private final UsuarioRepository usuarioRepository;
-	private final PasswordEncoder passwordEncoder;
+	private final CodigoVerificacaoRepository codigoRepository;
 	private final JwtEncoder jwtEncoder;
 	private final JwtProperties properties;
 	private final Clock clock;
-	// Hash comparado quando o email nao existe, para que a resposta leve o mesmo
-	// tempo e nao revele quais emails estao cadastrados.
-	private final String hashFicticio;
+	private final SecureRandom random = new SecureRandom();
 
 	@Autowired
-	public AuthService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, JwtEncoder jwtEncoder,
-			JwtProperties properties) {
-		this(usuarioRepository, passwordEncoder, jwtEncoder, properties, Clock.systemUTC());
+	public AuthService(UsuarioRepository usuarioRepository, CodigoVerificacaoRepository codigoRepository,
+			JwtEncoder jwtEncoder, JwtProperties properties) {
+		this(usuarioRepository, codigoRepository, jwtEncoder, properties, Clock.systemUTC());
 	}
 
-	AuthService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, JwtEncoder jwtEncoder,
-			JwtProperties properties, Clock clock) {
+	AuthService(UsuarioRepository usuarioRepository, CodigoVerificacaoRepository codigoRepository,
+			JwtEncoder jwtEncoder, JwtProperties properties, Clock clock) {
 		this.usuarioRepository = usuarioRepository;
-		this.passwordEncoder = passwordEncoder;
+		this.codigoRepository = codigoRepository;
 		this.jwtEncoder = jwtEncoder;
 		this.properties = properties;
 		this.clock = clock;
-		this.hashFicticio = passwordEncoder.encode(UUID.randomUUID().toString());
 	}
 
-	@Transactional(readOnly = true)
-	public TokenResponse login(LoginRequest request) {
-		Optional<Usuario> usuario = usuarioRepository.findByEmail(request.email().trim().toLowerCase());
-		String hash = usuario.map(Usuario::getSenha).orElse(hashFicticio);
-		if (!passwordEncoder.matches(request.senha(), hash) || usuario.isEmpty()) {
-			throw new CredenciaisInvalidasException();
+	@Transactional
+	public SolicitarCodigoResponse solicitarCodigo(SolicitarCodigoRequest request) {
+		String email = UsuarioService.normalizarEmail(request.email());
+		Usuario usuario = usuarioRepository.findByEmail(email).orElseGet(() -> cadastrar(email));
+
+		// Apenas o codigo mais recente fica valido.
+		codigoRepository.findByEmailAndUtilizadoFalse(email).forEach(antigo -> antigo.setUtilizado(true));
+
+		CodigoVerificacao codigo = new CodigoVerificacao();
+		codigo.setUsuario(usuario);
+		codigo.setEmail(email);
+		codigo.setCodigo(gerarCodigo());
+		codigo.setExpiraEm(LocalDateTime.now(clock).plus(VALIDADE_CODIGO));
+		codigoRepository.save(codigo);
+
+		enviarPorEmail(email, codigo.getCodigo());
+		return new SolicitarCodigoResponse("Codigo enviado para o email informado", codigo.getExpiraEm());
+	}
+
+	// noRollbackFor: o incremento de tentativas precisa ser gravado mesmo quando o codigo esta errado.
+	@Transactional(noRollbackFor = CodigoInvalidoException.class)
+	public TokenResponse verificarCodigo(VerificarCodigoRequest request) {
+		String email = UsuarioService.normalizarEmail(request.email());
+		CodigoVerificacao codigo = codigoRepository.findFirstByEmailAndUtilizadoFalseOrderByExpiraEmDesc(email)
+				.orElseThrow(CodigoInvalidoException::new);
+
+		if (!LocalDateTime.now(clock).isBefore(codigo.getExpiraEm())) {
+			codigo.setUtilizado(true);
+			throw new CodigoInvalidoException();
 		}
-		return gerarToken(usuario.get());
+		if (!MessageDigest.isEqual(codigo.getCodigo().getBytes(StandardCharsets.UTF_8),
+				request.codigo().getBytes(StandardCharsets.UTF_8))) {
+			codigo.setTentativas(codigo.getTentativas() + 1);
+			if (codigo.getTentativas() >= MAX_TENTATIVAS) {
+				codigo.setUtilizado(true);
+			}
+			throw new CodigoInvalidoException();
+		}
+
+		codigo.setUtilizado(true);
+		return gerarToken(codigo.getUsuario());
+	}
+
+	private Usuario cadastrar(String email) {
+		Usuario usuario = new Usuario();
+		usuario.setEmail(email);
+		// Nome provisorio a partir do email; o usuario pode altera-lo em PUT /api/usuarios/{id}.
+		String nome = email.substring(0, email.indexOf('@'));
+		usuario.setNome(nome.length() > TAMANHO_MAXIMO_NOME ? nome.substring(0, TAMANHO_MAXIMO_NOME) : nome);
+		return usuarioRepository.save(usuario);
+	}
+
+	private String gerarCodigo() {
+		return "%06d".formatted(random.nextInt(1_000_000));
+	}
+
+	// Simula o envio por email enquanto nao ha um provedor configurado.
+	private static void enviarPorEmail(String email, String codigo) {
+		System.out.println("""
+
+				==================================================
+				  [SIMULACAO DE EMAIL] Codigo de acesso
+				  Para: %s
+				  Codigo: %s
+				  Valido por %d minutos
+				==================================================
+				""".formatted(email, codigo, VALIDADE_CODIGO.toMinutes()));
 	}
 
 	private TokenResponse gerarToken(Usuario usuario) {
@@ -64,11 +130,12 @@ public class AuthService {
 				.subject(usuario.getId().toString())
 				.issuedAt(agora)
 				.expiresAt(expiraEm)
+				.claim("email", usuario.getEmail())
 				.claim("nome", usuario.getNome())
 				.build();
 		JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
 		String token = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
-		return new TokenResponse(token, "Bearer", expiraEm, usuario.getId());
+		return new TokenResponse(token, "Bearer", expiraEm, UsuarioResponse.from(usuario));
 	}
 
 }

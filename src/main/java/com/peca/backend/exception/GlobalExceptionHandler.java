@@ -1,6 +1,6 @@
 package com.peca.backend.exception;
 
-import com.peca.backend.auth.CredenciaisInvalidasException;
+import com.peca.backend.auth.CodigoInvalidoException;
 import com.peca.backend.storage.ArmazenamentoException;
 import com.peca.backend.storage.ImagemInvalidaException;
 import java.util.stream.Collectors;
@@ -26,8 +26,8 @@ public class GlobalExceptionHandler {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
 	}
 
-	@ExceptionHandler(CredenciaisInvalidasException.class)
-	public ProblemDetail handleCredenciais(CredenciaisInvalidasException ex) {
+	@ExceptionHandler(CodigoInvalidoException.class)
+	public ProblemDetail handleCodigoInvalido(CodigoInvalidoException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
 	}
 
