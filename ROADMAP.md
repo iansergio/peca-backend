@@ -11,9 +11,9 @@
 - [x] Configurar o Swagger/OpenAPI para documentação (acessível via `/swagger-ui.html`).
 
 ## Fase 2: Domínio de Usuários
-- [-] Criar Entidade e DTOs de Usuário (Nome, Email, WhatsApp). Email é o identificador único e obrigatório.
-- [-] Criar endpoints de perfil de Usuário (listar, buscar, editar e remover a própria conta). O cadastro é feito apenas via OTP (Fase 5); não existe mais `POST /api/usuarios`.
-- [-] Remover o campo Senha (e o hash BCrypt) da entidade, DTOs e CRUD de Usuário.
+- [x] Criar Entidade e DTOs de Usuário (Nome, Email, WhatsApp). Email é o identificador único e obrigatório.
+- [x] Criar endpoints de perfil de Usuário (listar, buscar, editar e remover a própria conta). O cadastro é feito apenas via OTP (Fase 5); não existe mais `POST /api/usuarios`.
+- [x] Remover o campo Senha (e o hash BCrypt) da entidade, DTOs e CRUD de Usuário.
 
 ## Fase 3: Domínio de Anúncios (Peças)
 - [x] Criar Entidade e DTOs de Peça (Título, Descrição, Preço, Categoria, Modelo de Celular, ID do Vendedor).
@@ -25,10 +25,10 @@
 - [x] Salvar a URL pública da imagem na Entidade da Peça.
 
 ## Fase 5: Autenticação (Passwordless OTP + JWT)
-- [-] Criar a entidade `CodigoVerificacao` (código OTP de 6 dígitos vinculado ao email, com expiração).
-- [-] Criar endpoint para solicitar código OTP por email (`POST /api/auth/solicitar-codigo`, cria o usuário se ele ainda não existir).
-- [-] Enviar o código OTP por email real via SMTP (`spring-boot-starter-mail` + `EmailService`), substituindo a simulação no console. Credenciais via `MAIL_*` no `.env`.
-- [-] Criar endpoint para validar o código OTP e emitir o token JWT (`POST /api/auth/verificar-codigo`).
-- [-] Remover o endpoint de login com senha (`POST /api/auth/login`).
-- [-] Proteger endpoints de escrita com JWT (apenas os endpoints de OTP e a leitura de peças são públicos).
-- [-] Usar o usuário do token como vendedor e restringir edição/exclusão/upload ao próprio dono.
+- [x] Criar a entidade `CodigoVerificacao` (código OTP de 6 dígitos vinculado ao email, com expiração).
+- [x] Criar endpoint para solicitar código OTP por email (`POST /api/auth/solicitar-codigo`, cria o usuário se ele ainda não existir).
+- [x] Enviar o código OTP por email real via SMTP (`spring-boot-starter-mail` + `EmailService`), substituindo a simulação no console. Credenciais via `MAIL_*` no `.env`.
+- [x] Criar endpoint para validar o código OTP e emitir o token JWT (`POST /api/auth/verificar-codigo`).
+- [x] Remover o endpoint de login com senha (`POST /api/auth/login`).
+- [x] Proteger endpoints de escrita com JWT (apenas os endpoints de OTP e a leitura de peças são públicos).
+- [x] Usar o usuário do token como vendedor e restringir edição/exclusão/upload ao próprio dono.
