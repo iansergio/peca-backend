@@ -32,7 +32,7 @@ public class SecurityConfig {
 				.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/error").permitAll()
-						.requestMatchers(HttpMethod.POST, "/api/auth/solicitar-codigo", "/api/auth/verificar-codigo", "/api/usuarios").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/auth/solicitar-codigo", "/api/auth/verificar-codigo").permitAll()
 						.requestMatchers(HttpMethod.GET, "/api/pecas", "/api/pecas/*").permitAll()
 						.anyRequest().authenticated())
 				.oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()))

@@ -19,17 +19,6 @@ public class UsuarioService {
 		this.repository = repository;
 	}
 
-	@Transactional
-	public UsuarioResponse criar(UsuarioRequest request) {
-		String email = normalizarEmail(request.email());
-		if (repository.existsByEmail(email)) {
-			throw new ConflitoException("Email ja cadastrado");
-		}
-		Usuario usuario = new Usuario();
-		aplicar(usuario, request, email);
-		return UsuarioResponse.from(repository.save(usuario));
-	}
-
 	@Transactional(readOnly = true)
 	public List<UsuarioResponse> listar() {
 		return repository.findAll().stream().map(UsuarioResponse::from).toList();

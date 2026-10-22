@@ -10,7 +10,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +18,6 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,23 +25,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/usuarios")
-@Tag(name = "Usuarios", description = "CRUD de usuarios")
+@Tag(name = "Usuarios", description = "Perfil de usuarios (o cadastro e feito em POST /api/auth/solicitar-codigo)")
 public class UsuarioController {
 
 	private final UsuarioService service;
 
 	public UsuarioController(UsuarioService service) {
 		this.service = service;
-	}
-
-	@PostMapping
-	@Operation(summary = "Cria um usuario (cadastro publico)")
-	@ApiResponse(responseCode = "201", description = "Usuario criado")
-	@ApiResponse(responseCode = "400", description = "Dados invalidos")
-	@ApiResponse(responseCode = "409", description = "Email ja cadastrado")
-	public ResponseEntity<UsuarioResponse> criar(@Valid @RequestBody UsuarioRequest request) {
-		UsuarioResponse criado = service.criar(request);
-		return ResponseEntity.created(URI.create("/api/usuarios/" + criado.id())).body(criado);
 	}
 
 	@GetMapping

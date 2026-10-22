@@ -81,6 +81,10 @@ class SegurancaIntegrationTest {
 				.andExpect(status().isUnauthorized());
 		mockMvc.perform(delete("/api/pecas/" + UUID.randomUUID())).andExpect(status().isUnauthorized());
 		mockMvc.perform(get("/api/usuarios")).andExpect(status().isUnauthorized());
+		mockMvc.perform(post("/api/usuarios").contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"nome":"Maria","email":"maria@email.com"}"""))
+				.andExpect(status().isUnauthorized());
 		mockMvc.perform(post("/api/pecas").header(HttpHeaders.AUTHORIZATION, "Bearer token-invalido")
 						.contentType(MediaType.APPLICATION_JSON).content(PECA))
 				.andExpect(status().isUnauthorized());
