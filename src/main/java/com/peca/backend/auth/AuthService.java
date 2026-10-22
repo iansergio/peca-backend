@@ -30,8 +30,6 @@ public class AuthService {
 
 	static final Duration VALIDADE_CODIGO = Duration.ofMinutes(10);
 	static final int MAX_TENTATIVAS = 5;
-	private static final int TAMANHO_MAXIMO_NOME = 120;
-
 	private final UsuarioRepository usuarioRepository;
 	private final CodigoVerificacaoRepository codigoRepository;
 	private final JwtEncoder jwtEncoder;
@@ -59,7 +57,7 @@ public class AuthService {
 	@Transactional
 	public SolicitarCodigoResponse solicitarCodigo(SolicitarCodigoRequest request) {
 		String email = UsuarioService.normalizarEmail(request.email());
-		Usuario usuario = usuarioRepository.findByEmail(email).orElseGet(() -> cadastrar(email));
+		Usuario usuario = usuarioRepository.findByEmail(email).orElseGet(() -> cadastrar(request.nome(), email));
 
 		// Apenas o codigo mais recente fica valido.
 		codigoRepository.findByEmailAndUtilizadoFalse(email).forEach(antigo -> antigo.setUtilizado(true));
@@ -100,12 +98,12 @@ public class AuthService {
 		return gerarToken(codigo.getUsuario());
 	}
 
-	private Usuario cadastrar(String email) {
+	// O nome so e usado no cadastro: um usuario existente nao tem o nome sobrescrito por quem pede o codigo,
+	// ja que o email ainda nao foi confirmado nesse ponto. Para alterar, use PUT /api/usuarios/{id}.
+	private Usuario cadastrar(String nome, String email) {
 		Usuario usuario = new Usuario();
 		usuario.setEmail(email);
-		// Nome provisorio a partir do email; o usuario pode altera-lo em PUT /api/usuarios/{id}.
-		String nome = email.substring(0, email.indexOf('@'));
-		usuario.setNome(nome.length() > TAMANHO_MAXIMO_NOME ? nome.substring(0, TAMANHO_MAXIMO_NOME) : nome);
+		usuario.setNome(nome.trim());
 		return usuarioRepository.save(usuario);
 	}
 

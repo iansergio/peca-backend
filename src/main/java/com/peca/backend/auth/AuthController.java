@@ -26,10 +26,11 @@ public class AuthController {
 
 	@PostMapping("/solicitar-codigo")
 	@Operation(summary = "Envia um codigo de 6 digitos para o email",
-			description = "Se o email ainda nao estiver cadastrado, o usuario e criado automaticamente. "
+			description = "Nome e email sao obrigatorios. Se o email ainda nao estiver cadastrado, o usuario e criado "
+					+ "automaticamente com o nome informado (o nome de um usuario existente nao e alterado). "
 					+ "O codigo vale por 10 minutos e e enviado por email.")
 	@ApiResponse(responseCode = "200", description = "Codigo gerado e enviado")
-	@ApiResponse(responseCode = "400", description = "Email invalido")
+	@ApiResponse(responseCode = "400", description = "Nome ausente ou email invalido")
 	@ApiResponse(responseCode = "502", description = "Falha ao enviar o email com o codigo")
 	public SolicitarCodigoResponse solicitarCodigo(@Valid @RequestBody SolicitarCodigoRequest request) {
 		return service.solicitarCodigo(request);

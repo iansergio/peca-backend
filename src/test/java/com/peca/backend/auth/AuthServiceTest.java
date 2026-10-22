@@ -86,12 +86,12 @@ class AuthServiceTest {
 		when(usuarioRepository.findByEmail("maria@email.com")).thenReturn(Optional.empty());
 		when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
 
-		SolicitarCodigoResponse response = service.solicitarCodigo(new SolicitarCodigoRequest(" Maria@Email.com "));
+		SolicitarCodigoResponse response = service.solicitarCodigo(new SolicitarCodigoRequest(" Maria Silva ", " Maria@Email.com "));
 
 		ArgumentCaptor<Usuario> usuario = ArgumentCaptor.forClass(Usuario.class);
 		verify(usuarioRepository).save(usuario.capture());
 		assertThat(usuario.getValue().getEmail()).isEqualTo("maria@email.com");
-		assertThat(usuario.getValue().getNome()).isEqualTo("maria");
+		assertThat(usuario.getValue().getNome()).isEqualTo("Maria Silva");
 
 		ArgumentCaptor<CodigoVerificacao> codigo = ArgumentCaptor.forClass(CodigoVerificacao.class);
 		verify(codigoRepository).save(codigo.capture());
@@ -109,7 +109,7 @@ class AuthServiceTest {
 		when(usuarioRepository.findByEmail("maria@email.com")).thenReturn(Optional.of(existente));
 		doThrow(new EnvioEmailException("falhou", null)).when(emailService).enviarCodigoOtp(any(), any());
 
-		assertThatThrownBy(() -> service.solicitarCodigo(new SolicitarCodigoRequest("maria@email.com")))
+		assertThatThrownBy(() -> service.solicitarCodigo(new SolicitarCodigoRequest("Outro Nome", "maria@email.com")))
 				.isInstanceOf(EnvioEmailException.class);
 	}
 
@@ -120,9 +120,10 @@ class AuthServiceTest {
 		when(usuarioRepository.findByEmail("maria@email.com")).thenReturn(Optional.of(existente));
 		when(codigoRepository.findByEmailAndUtilizadoFalse("maria@email.com")).thenReturn(List.of(anterior));
 
-		service.solicitarCodigo(new SolicitarCodigoRequest("maria@email.com"));
+		service.solicitarCodigo(new SolicitarCodigoRequest("Outro Nome", "maria@email.com"));
 
 		verify(usuarioRepository, never()).save(any());
+		assertThat(existente.getNome()).isEqualTo("Maria Silva");
 		assertThat(anterior.isUtilizado()).isTrue();
 	}
 
