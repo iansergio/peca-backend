@@ -18,9 +18,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 /**
- * Fluxo completo: cadastro publico, login, rotas protegidas e checagem de autoria.
+ * Fluxo completo: cadastro integrado por OTP, rotas protegidas e checagem de autoria.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -32,20 +33,36 @@ class SegurancaIntegrationTest {
 	@Autowired
 	private MockMvc mockMvc;
 
+	@Autowired
+	private CodigoVerificacaoRepository codigoRepository;
+
 	private record Sessao(String authorization, String usuarioId) {
 	}
 
+	private void solicitarCodigo(String email) throws Exception {
+		mockMvc.perform(post("/api/auth/solicitar-codigo").contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"email":"%s"}""".formatted(email)))
+				.andExpect(status().isOk());
+	}
+
+	private ResultActions verificarCodigo(String email, String codigo) throws Exception {
+		return mockMvc.perform(post("/api/auth/verificar-codigo").contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"email":"%s","codigo":"%s"}""".formatted(email, codigo)));
+	}
+
+	private String codigoAtual(String email) {
+		return codigoRepository.findByEmailAndUtilizadoFalse(email).getFirst().getCodigo();
+	}
+
 	private Sessao cadastrarELogar(String email) throws Exception {
-		mockMvc.perform(post("/api/usuarios").contentType(MediaType.APPLICATION_JSON)
-						.content("""
-								{"nome":"Usuario","email":"%s","senha":"senhaForte123","whatsapp":"11999998888"}""".formatted(email)))
-				.andExpect(status().isCreated());
-		String resposta = mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
-						.content("""
-								{"email":"%s","senha":"senhaForte123"}""".formatted(email)))
+		solicitarCodigo(email);
+		String resposta = verificarCodigo(email, codigoAtual(email))
 				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.usuario.email").value(email))
 				.andReturn().getResponse().getContentAsString();
-		return new Sessao("Bearer " + JsonPath.read(resposta, "$.token"), JsonPath.read(resposta, "$.usuarioId"));
+		return new Sessao("Bearer " + JsonPath.read(resposta, "$.token"), JsonPath.read(resposta, "$.usuario.id"));
 	}
 
 	private static String email() {
@@ -70,12 +87,22 @@ class SegurancaIntegrationTest {
 	}
 
 	@Test
-	void loginComSenhaErradaRetorna401() throws Exception {
+	void codigoErradoOuReutilizadoRetorna401() throws Exception {
 		String email = email();
-		cadastrarELogar(email);
+		solicitarCodigo(email);
+		String codigo = codigoAtual(email);
+		String errado = codigo.equals("000000") ? "111111" : "000000";
+
+		verificarCodigo(email, errado).andExpect(status().isUnauthorized());
+		verificarCodigo(email, codigo).andExpect(status().isOk());
+		verificarCodigo(email, codigo).andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void loginPorSenhaNaoExisteMais() throws Exception {
 		mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
 						.content("""
-								{"email":"%s","senha":"errada123"}""".formatted(email)))
+								{"email":"a@email.com","senha":"qualquer"}"""))
 				.andExpect(status().isUnauthorized());
 	}
 
@@ -87,7 +114,7 @@ class SegurancaIntegrationTest {
 		String criada = mockMvc.perform(post("/api/pecas").header(HttpHeaders.AUTHORIZATION, dono)
 						.contentType(MediaType.APPLICATION_JSON).content(PECA))
 				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.vendedor.nome").value("Usuario"))
+				.andExpect(jsonPath("$.vendedor.nome").isNotEmpty())
 				.andExpect(jsonPath("$.vendedor", not(hasKey("senha"))))
 				.andReturn().getResponse().getContentAsString();
 		String id = JsonPath.read(criada, "$.id");

@@ -7,7 +7,6 @@ import com.peca.backend.usuario.dto.UsuarioRequest;
 import com.peca.backend.usuario.dto.UsuarioResponse;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,11 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class UsuarioService {
 
 	private final UsuarioRepository repository;
-	private final PasswordEncoder passwordEncoder;
 
-	public UsuarioService(UsuarioRepository repository, PasswordEncoder passwordEncoder) {
+	public UsuarioService(UsuarioRepository repository) {
 		this.repository = repository;
-		this.passwordEncoder = passwordEncoder;
 	}
 
 	@Transactional
@@ -75,11 +72,10 @@ public class UsuarioService {
 	private void aplicar(Usuario usuario, UsuarioRequest request, String email) {
 		usuario.setNome(request.nome().trim());
 		usuario.setEmail(email);
-		usuario.setSenha(passwordEncoder.encode(request.senha()));
 		usuario.setWhatsapp(request.whatsapp());
 	}
 
-	private static String normalizarEmail(String email) {
+	public static String normalizarEmail(String email) {
 		return email.trim().toLowerCase();
 	}
 

@@ -26,7 +26,6 @@ class PecaRepositoryTest {
 		Usuario vendedor = new Usuario();
 		vendedor.setNome("Maria Silva");
 		vendedor.setEmail("maria@email.com");
-		vendedor.setSenha("hash");
 		usuarioRepository.save(vendedor);
 
 		repository.save(peca("Tela iPhone 13", "iPhone 13", "450.00", vendedor));

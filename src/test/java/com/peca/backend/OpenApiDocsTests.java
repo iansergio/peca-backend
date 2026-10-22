@@ -23,7 +23,8 @@ class OpenApiDocsTests {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.paths['/api/usuarios']").exists())
 				.andExpect(jsonPath("$.paths['/api/usuarios/{id}']").exists())
-				.andExpect(jsonPath("$.components.schemas.UsuarioResponse.properties.senha").doesNotExist());
+				.andExpect(jsonPath("$.components.schemas.UsuarioResponse.properties.senha").doesNotExist())
+				.andExpect(jsonPath("$.components.schemas.UsuarioRequest.properties.senha").doesNotExist());
 	}
 
 	@Test
@@ -54,7 +55,9 @@ class OpenApiDocsTests {
 				.andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"))
 				.andExpect(jsonPath("$.paths['/api/pecas'].post.security[0].bearerAuth").exists())
 				.andExpect(jsonPath("$.paths['/api/pecas'].get.security").doesNotExist())
-				.andExpect(jsonPath("$.paths['/api/auth/login'].post").exists())
+				.andExpect(jsonPath("$.paths['/api/auth/solicitar-codigo'].post").exists())
+				.andExpect(jsonPath("$.paths['/api/auth/verificar-codigo'].post").exists())
+				.andExpect(jsonPath("$.paths['/api/auth/login']").doesNotExist())
 				.andExpect(jsonPath("$.components.schemas.PecaRequest.properties.vendedorId").doesNotExist());
 	}
 

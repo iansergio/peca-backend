@@ -48,7 +48,6 @@ class PecaServiceTest {
 		usuario.setId(id);
 		usuario.setNome("Maria Silva");
 		usuario.setEmail("maria@email.com");
-		usuario.setSenha("hash");
 		usuario.setWhatsapp("11999998888");
 		return usuario;
 	}

@@ -22,9 +22,6 @@ public class Usuario {
 	@Column(nullable = false, unique = true, length = 160)
 	private String email;
 
-	@Column(nullable = false)
-	private String senha;
-
 	@Column(length = 20)
 	private String whatsapp;
 
@@ -50,14 +47,6 @@ public class Usuario {
 
 	public void setEmail(String email) {
 		this.email = email;
-	}
-
-	public String getSenha() {
-		return senha;
-	}
-
-	public void setSenha(String senha) {
-		this.senha = senha;
 	}
 
 	public String getWhatsapp() {
