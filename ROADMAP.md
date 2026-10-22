@@ -19,6 +19,7 @@
 - [x] Criar Entidade e DTOs de Peça (Título, Descrição, Preço, Categoria, Modelo de Celular, ID do Vendedor).
 - [x] Criar endpoints de criação, edição e exclusão de anúncios. (Autoria via JWT na Fase 5.)
 - [x] Criar endpoint público de listagem de peças com filtros (por modelo e preço).
+- [-] Exigir número de contato (`whatsapp`, 10 a 13 dígitos) ao criar/editar anúncio; o número é salvo no perfil do vendedor e exibido em `vendedor.whatsapp`.
 
 ## Fase 4: Imagens
 - [x] Integrar API do Supabase Storage para upload de imagens das peças.
@@ -27,6 +28,7 @@
 ## Fase 5: Autenticação (Passwordless OTP + JWT)
 - [x] Criar a entidade `CodigoVerificacao` (código OTP de 6 dígitos vinculado ao email, com expiração).
 - [x] Criar endpoint para solicitar código OTP por email (`POST /api/auth/solicitar-codigo`, cria o usuário se ele ainda não existir).
+- [-] Exigir o nome do usuário ao solicitar o código OTP (`nome` obrigatório em `POST /api/auth/solicitar-codigo`); o nome é usado no cadastro de um usuário novo e não sobrescreve o de um usuário existente.
 - [x] Enviar o código OTP por email real via SMTP (`spring-boot-starter-mail` + `EmailService`), substituindo a simulação no console. Credenciais via `MAIL_*` no `.env`.
 - [x] Criar endpoint para validar o código OTP e emitir o token JWT (`POST /api/auth/verificar-codigo`).
 - [x] Remover o endpoint de login com senha (`POST /api/auth/login`).
