@@ -17,7 +17,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -44,28 +43,6 @@ class UsuarioServiceTest {
 		usuario.setNome("Maria Silva");
 		usuario.setEmail(email);
 		return usuario;
-	}
-
-	@Test
-	void criarDeveNormalizarEmail() {
-		when(repository.existsByEmail("maria@email.com")).thenReturn(false);
-		when(repository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
-
-		UsuarioResponse response = service.criar(request("  Maria@Email.com "));
-
-		ArgumentCaptor<Usuario> captor = ArgumentCaptor.forClass(Usuario.class);
-		verify(repository).save(captor.capture());
-		assertThat(captor.getValue().getEmail()).isEqualTo("maria@email.com");
-		assertThat(response.email()).isEqualTo("maria@email.com");
-	}
-
-	@Test
-	void criarDeveFalharQuandoEmailJaExiste() {
-		when(repository.existsByEmail("maria@email.com")).thenReturn(true);
-
-		assertThatThrownBy(() -> service.criar(request("maria@email.com")))
-				.isInstanceOf(ConflitoException.class);
-		verify(repository, never()).save(any());
 	}
 
 	@Test

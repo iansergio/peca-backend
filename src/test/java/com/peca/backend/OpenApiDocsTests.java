@@ -21,7 +21,8 @@ class OpenApiDocsTests {
 	void apiDocsDeveExporEndpointsDeUsuarios() throws Exception {
 		mockMvc.perform(get("/v3/api-docs"))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.paths['/api/usuarios']").exists())
+				.andExpect(jsonPath("$.paths['/api/usuarios'].get").exists())
+				.andExpect(jsonPath("$.paths['/api/usuarios'].post").doesNotExist())
 				.andExpect(jsonPath("$.paths['/api/usuarios/{id}']").exists())
 				.andExpect(jsonPath("$.components.schemas.UsuarioResponse.properties.senha").doesNotExist())
 				.andExpect(jsonPath("$.components.schemas.UsuarioRequest.properties.senha").doesNotExist());

@@ -4,6 +4,7 @@ import com.peca.backend.auth.dto.SolicitarCodigoRequest;
 import com.peca.backend.auth.dto.SolicitarCodigoResponse;
 import com.peca.backend.auth.dto.TokenResponse;
 import com.peca.backend.auth.dto.VerificarCodigoRequest;
+import com.peca.backend.email.EmailService;
 import com.peca.backend.usuario.Usuario;
 import com.peca.backend.usuario.UsuarioRepository;
 import com.peca.backend.usuario.UsuarioService;
@@ -34,21 +35,23 @@ public class AuthService {
 	private final UsuarioRepository usuarioRepository;
 	private final CodigoVerificacaoRepository codigoRepository;
 	private final JwtEncoder jwtEncoder;
+	private final EmailService emailService;
 	private final JwtProperties properties;
 	private final Clock clock;
 	private final SecureRandom random = new SecureRandom();
 
 	@Autowired
 	public AuthService(UsuarioRepository usuarioRepository, CodigoVerificacaoRepository codigoRepository,
-			JwtEncoder jwtEncoder, JwtProperties properties) {
-		this(usuarioRepository, codigoRepository, jwtEncoder, properties, Clock.systemUTC());
+			JwtEncoder jwtEncoder, EmailService emailService, JwtProperties properties) {
+		this(usuarioRepository, codigoRepository, jwtEncoder, emailService, properties, Clock.systemUTC());
 	}
 
 	AuthService(UsuarioRepository usuarioRepository, CodigoVerificacaoRepository codigoRepository,
-			JwtEncoder jwtEncoder, JwtProperties properties, Clock clock) {
+			JwtEncoder jwtEncoder, EmailService emailService, JwtProperties properties, Clock clock) {
 		this.usuarioRepository = usuarioRepository;
 		this.codigoRepository = codigoRepository;
 		this.jwtEncoder = jwtEncoder;
+		this.emailService = emailService;
 		this.properties = properties;
 		this.clock = clock;
 	}
@@ -68,7 +71,8 @@ public class AuthService {
 		codigo.setExpiraEm(LocalDateTime.now(clock).plus(VALIDADE_CODIGO));
 		codigoRepository.save(codigo);
 
-		enviarPorEmail(email, codigo.getCodigo());
+		// Dentro da transacao: se o envio falhar, o codigo (e o cadastro novo) sao desfeitos.
+		emailService.enviarCodigoOtp(email, codigo.getCodigo());
 		return new SolicitarCodigoResponse("Codigo enviado para o email informado", codigo.getExpiraEm());
 	}
 
@@ -107,19 +111,6 @@ public class AuthService {
 
 	private String gerarCodigo() {
 		return "%06d".formatted(random.nextInt(1_000_000));
-	}
-
-	// Simula o envio por email enquanto nao ha um provedor configurado.
-	private static void enviarPorEmail(String email, String codigo) {
-		System.out.println("""
-
-				==================================================
-				  [SIMULACAO DE EMAIL] Codigo de acesso
-				  Para: %s
-				  Codigo: %s
-				  Valido por %d minutos
-				==================================================
-				""".formatted(email, codigo, VALIDADE_CODIGO.toMinutes()));
 	}
 
 	private TokenResponse gerarToken(Usuario usuario) {

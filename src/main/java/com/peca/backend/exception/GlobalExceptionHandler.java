@@ -1,6 +1,7 @@
 package com.peca.backend.exception;
 
 import com.peca.backend.auth.CodigoInvalidoException;
+import com.peca.backend.email.EnvioEmailException;
 import com.peca.backend.storage.ArmazenamentoException;
 import com.peca.backend.storage.ImagemInvalidaException;
 import java.util.stream.Collectors;
@@ -59,6 +60,11 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(ArmazenamentoException.class)
 	public ProblemDetail handleArmazenamento(ArmazenamentoException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, ex.getMessage());
+	}
+
+	@ExceptionHandler(EnvioEmailException.class)
+	public ProblemDetail handleEnvioEmail(EnvioEmailException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, ex.getMessage());
 	}
 
