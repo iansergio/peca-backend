@@ -3,6 +3,7 @@ package com.peca.backend.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -11,6 +12,8 @@ import com.peca.backend.auth.dto.SolicitarCodigoRequest;
 import com.peca.backend.auth.dto.SolicitarCodigoResponse;
 import com.peca.backend.auth.dto.TokenResponse;
 import com.peca.backend.auth.dto.VerificarCodigoRequest;
+import com.peca.backend.email.EmailService;
+import com.peca.backend.email.EnvioEmailException;
 import com.peca.backend.usuario.Usuario;
 import com.peca.backend.usuario.UsuarioRepository;
 import java.nio.charset.StandardCharsets;
@@ -46,6 +49,9 @@ class AuthServiceTest {
 	@Mock
 	private CodigoVerificacaoRepository codigoRepository;
 
+	@Mock
+	private EmailService emailService;
+
 	private final SecurityConfig config = new SecurityConfig();
 	private final SecretKey chave = new SecretKeySpec(
 			"segredo-de-teste-com-pelo-menos-32-caracteres".getBytes(StandardCharsets.UTF_8), "HmacSHA256");
@@ -54,7 +60,7 @@ class AuthServiceTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new AuthService(usuarioRepository, codigoRepository, config.jwtEncoder(chave),
+		service = new AuthService(usuarioRepository, codigoRepository, config.jwtEncoder(chave), emailService,
 				new JwtProperties("ignorado", Duration.ofHours(2)), Clock.fixed(AGORA, ZoneOffset.UTC));
 	}
 
@@ -94,6 +100,17 @@ class AuthServiceTest {
 		assertThat(codigo.getValue().getExpiraEm()).isEqualTo(AGORA_LOCAL.plusMinutes(10));
 		assertThat(codigo.getValue().isUtilizado()).isFalse();
 		assertThat(response.expiraEm()).isEqualTo(AGORA_LOCAL.plusMinutes(10));
+		verify(emailService).enviarCodigoOtp("maria@email.com", codigo.getValue().getCodigo());
+	}
+
+	@Test
+	void falhaNoEnvioDoEmailDevePropagarErro() {
+		Usuario existente = usuario(UUID.randomUUID());
+		when(usuarioRepository.findByEmail("maria@email.com")).thenReturn(Optional.of(existente));
+		doThrow(new EnvioEmailException("falhou", null)).when(emailService).enviarCodigoOtp(any(), any());
+
+		assertThatThrownBy(() -> service.solicitarCodigo(new SolicitarCodigoRequest("maria@email.com")))
+				.isInstanceOf(EnvioEmailException.class);
 	}
 
 	@Test
