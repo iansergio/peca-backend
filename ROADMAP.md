@@ -11,8 +11,9 @@
 - [x] Configurar o Swagger/OpenAPI para documentação (acessível via `/swagger-ui.html`).
 
 ## Fase 2: Domínio de Usuários
-- [x] Criar Entidade e DTOs de Usuário (Nome, Email, Senha, WhatsApp).
-- [x] Criar CRUD de Usuários e configuração base de segurança. (Senha com hash BCrypt; JWT na Fase 5.)
+- [x] Criar Entidade e DTOs de Usuário (Nome, Email, WhatsApp).
+- [x] Criar CRUD de Usuários e configuração base de segurança. (JWT na Fase 5.)
+- [ ] Remover o campo Senha (e o hash BCrypt) da entidade, DTOs e CRUD de Usuário — o código atual ainda possui senha.
 
 ## Fase 3: Domínio de Anúncios (Peças)
 - [x] Criar Entidade e DTOs de Peça (Título, Descrição, Preço, Categoria, Modelo de Celular, ID do Vendedor).
@@ -23,7 +24,10 @@
 - [x] Integrar API do Supabase Storage para upload de imagens das peças.
 - [x] Salvar a URL pública da imagem na Entidade da Peça.
 
-## Fase 5: Autenticação JWT
-- [x] Criar endpoint de login (`POST /api/auth/login`) que emite token JWT.
+## Fase 5: Autenticação (Passwordless OTP + JWT)
+- [ ] Criar a entidade `CodigoVerificacao` (código OTP de 6 dígitos vinculado ao email, com expiração).
+- [ ] Criar endpoint para solicitar código OTP por email (cria o usuário se ele ainda não existir).
+- [ ] Criar endpoint para validar o código OTP e emitir o token JWT.
+- [ ] Remover o endpoint de login com senha (`POST /api/auth/login`).
 - [x] Proteger endpoints de escrita com JWT (cadastro de usuário e leitura de peças continuam públicos).
 - [x] Usar o usuário do token como vendedor e restringir edição/exclusão/upload ao próprio dono.
