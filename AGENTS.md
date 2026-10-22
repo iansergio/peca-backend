@@ -13,6 +13,7 @@
 3. Todas as rotas da API devem ser documentadas via anotações do Swagger/OpenAPI.
 4. Senhas e variáveis sensíveis (como credenciais do Supabase) devem vir de variáveis de ambiente (`application.properties` via `System.getenv`).
 5. Proteja os endpoints de escrita (criação de anúncios, edição de perfis) com autenticação JWT.
+6. O sistema de usuários **não utiliza senhas**. O email é o único identificador do usuário e a autenticação é feita exclusivamente via Passwordless OTP (código de 6 dígitos enviado por email), que, ao ser validado, emite o token JWT. Não crie campos, endpoints ou fluxos baseados em senha.
 
 ## Fluxo de Trabalho (Obrigatório)
 1. Trabalhe em branches isoladas (ex: `feat/api-anuncios`, `fix/conexao-banco`).
