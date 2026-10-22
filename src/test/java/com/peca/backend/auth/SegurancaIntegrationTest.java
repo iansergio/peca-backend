@@ -30,7 +30,7 @@ import org.springframework.test.web.servlet.ResultActions;
 class SegurancaIntegrationTest {
 
 	private static final String PECA = """
-			{"titulo":"Tela iPhone 13","descricao":"Original","preco":450.00,"categoria":"Tela","modeloCelular":"iPhone 13"}""";
+			{"titulo":"Tela iPhone 13","descricao":"Original","preco":450.00,"categoria":"Tela","modeloCelular":"iPhone 13","whatsapp":"11999998888"}""";
 
 	@Autowired
 	private MockMvc mockMvc;
@@ -48,7 +48,7 @@ class SegurancaIntegrationTest {
 	private void solicitarCodigo(String email) throws Exception {
 		mockMvc.perform(post("/api/auth/solicitar-codigo").contentType(MediaType.APPLICATION_JSON)
 						.content("""
-								{"email":"%s"}""".formatted(email)))
+								{"nome":"Maria Silva","email":"%s"}""".formatted(email)))
 				.andExpect(status().isOk());
 	}
 
@@ -94,6 +94,36 @@ class SegurancaIntegrationTest {
 		mockMvc.perform(post("/api/pecas").header(HttpHeaders.AUTHORIZATION, "Bearer token-invalido")
 						.contentType(MediaType.APPLICATION_JSON).content(PECA))
 				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void solicitarCodigoSemNomeRetorna400() throws Exception {
+		mockMvc.perform(post("/api/auth/solicitar-codigo").contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"email":"%s"}""".formatted(email())))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void cadastroPorOtpUsaONomeInformado() throws Exception {
+		String email = email();
+		solicitarCodigo(email);
+		verificarCodigo(email, codigoAtual(email))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.usuario.nome").value("Maria Silva"));
+	}
+
+	@Test
+	void anuncioSemNumeroDeContatoRetorna400() throws Exception {
+		String dono = cadastrarELogar(email()).authorization();
+		mockMvc.perform(post("/api/pecas").header(HttpHeaders.AUTHORIZATION, dono)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(PECA.replace(",\"whatsapp\":\"11999998888\"", "")))
+				.andExpect(status().isBadRequest());
+		mockMvc.perform(post("/api/pecas").header(HttpHeaders.AUTHORIZATION, dono)
+						.contentType(MediaType.APPLICATION_JSON).content(PECA))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.vendedor.whatsapp").value("11999998888"));
 	}
 
 	@Test

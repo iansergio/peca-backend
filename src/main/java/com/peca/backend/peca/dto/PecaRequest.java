@@ -5,6 +5,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
@@ -28,5 +29,10 @@ public record PecaRequest(
 
 		@Schema(description = "Modelo de celular compativel", example = "iPhone 13")
 		@NotBlank @Size(max = 80)
-		String modeloCelular) {
+		String modeloCelular,
+
+		@Schema(description = "Numero de contato (WhatsApp) do vendedor com DDD, apenas digitos. "
+				+ "Obrigatorio para anunciar; fica salvo no perfil do vendedor", example = "11999998888")
+		@NotBlank @Pattern(regexp = "\\d{10,13}", message = "deve conter de 10 a 13 digitos")
+		String whatsapp) {
 }

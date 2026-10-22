@@ -43,10 +43,11 @@ public class PecaController {
 	}
 
 	@PostMapping
-	@Operation(summary = "Cria um anuncio de peca", description = "O vendedor e o usuario do token.")
+	@Operation(summary = "Cria um anuncio de peca",
+			description = "O vendedor e o usuario do token. O numero de contato (whatsapp) e obrigatorio e fica salvo no perfil do vendedor.")
 	@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 	@ApiResponse(responseCode = "201", description = "Anuncio criado")
-	@ApiResponse(responseCode = "400", description = "Dados invalidos")
+	@ApiResponse(responseCode = "400", description = "Dados invalidos ou numero de contato ausente")
 	@ApiResponse(responseCode = "401", description = "Token ausente ou invalido")
 	@ApiResponse(responseCode = "404", description = "Usuario do token nao existe mais")
 	public ResponseEntity<PecaResponse> criar(@Valid @RequestBody PecaRequest request,
