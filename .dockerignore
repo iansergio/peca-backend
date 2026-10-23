@@ -1,0 +1,15 @@
+# Segredos nunca entram na imagem: a configuracao vem por variavel de ambiente em runtime.
+.env
+.env.*
+
+.git
+.github
+target
+.idea
+.vscode
+**/*.md
+HELP.md
+
+Dockerfile
+.dockerignore
+docker-compose.yml
