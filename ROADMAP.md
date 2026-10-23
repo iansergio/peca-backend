@@ -15,6 +15,8 @@
 - [x] Criar Entidade e DTOs de Usuário (Nome, Email, WhatsApp). Email é o identificador único e obrigatório.
 - [-] Criar endpoints de perfil de Usuário restritos à própria conta: `GET /api/usuarios/me`, buscar (`GET /api/usuarios/{id}`, 403 para outro id), editar e remover. Não existe listagem de usuários; dados públicos do vendedor saem só em `PecaResponse.vendedor` (sem email). O cadastro é feito apenas via OTP (Fase 5); não existe mais `POST /api/usuarios`.
 - [x] Remover o campo Senha (e o hash BCrypt) da entidade, DTOs e CRUD de Usuário.
+- [-] Edição de perfil não altera e-mail (`PUT /api/usuarios/{id}` aceita só nome e WhatsApp; o e-mail é a identidade confirmada por OTP).
+- [ ] Troca de e-mail com confirmação por OTP no novo endereço.
 
 ## Fase 3: Domínio de Anúncios (Peças)
 - [x] Criar Entidade e DTOs de Peça (Título, Descrição, Preço, Categoria, Modelo de Celular, ID do Vendedor).
