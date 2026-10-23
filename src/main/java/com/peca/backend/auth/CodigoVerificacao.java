@@ -27,10 +27,15 @@ public class CodigoVerificacao {
 	@GeneratedValue(strategy = GenerationType.UUID)
 	private UUID id;
 
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "usuario_id", nullable = false)
+	// Nulo enquanto o email nao tem conta: o usuario so e criado quando o codigo e validado.
+	@ManyToOne(fetch = FetchType.LAZY, optional = true)
+	@JoinColumn(name = "usuario_id")
 	@OnDelete(action = OnDeleteAction.CASCADE)
 	private Usuario usuario;
+
+	// Nome usado no cadastro quando o email ainda nao tem conta.
+	@Column(length = 120)
+	private String nome;
 
 	@Column(nullable = false, length = 6)
 	private String codigo;
@@ -48,6 +53,10 @@ public class CodigoVerificacao {
 	@Column(nullable = false)
 	private int tentativas;
 
+	// Base do intervalo minimo e do limite de solicitacoes por hora.
+	@Column(name = "criado_em", nullable = false)
+	private LocalDateTime criadoEm;
+
 	public UUID getId() {
 		return id;
 	}
@@ -62,6 +71,14 @@ public class CodigoVerificacao {
 
 	public void setUsuario(Usuario usuario) {
 		this.usuario = usuario;
+	}
+
+	public String getNome() {
+		return nome;
+	}
+
+	public void setNome(String nome) {
+		this.nome = nome;
 	}
 
 	public String getCodigo() {
@@ -102,6 +119,14 @@ public class CodigoVerificacao {
 
 	public void setTentativas(int tentativas) {
 		this.tentativas = tentativas;
+	}
+
+	public LocalDateTime getCriadoEm() {
+		return criadoEm;
+	}
+
+	public void setCriadoEm(LocalDateTime criadoEm) {
+		this.criadoEm = criadoEm;
 	}
 
 }

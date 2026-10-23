@@ -13,8 +13,10 @@
 
 ## Fase 2: Domínio de Usuários
 - [x] Criar Entidade e DTOs de Usuário (Nome, Email, WhatsApp). Email é o identificador único e obrigatório.
-- [x] Criar endpoints de perfil de Usuário (listar, buscar, editar e remover a própria conta). O cadastro é feito apenas via OTP (Fase 5); não existe mais `POST /api/usuarios`.
+- [-] Criar endpoints de perfil de Usuário restritos à própria conta: `GET /api/usuarios/me`, buscar (`GET /api/usuarios/{id}`, 403 para outro id), editar e remover. Não existe listagem de usuários; dados públicos do vendedor saem só em `PecaResponse.vendedor` (sem email). O cadastro é feito apenas via OTP (Fase 5); não existe mais `POST /api/usuarios`.
 - [x] Remover o campo Senha (e o hash BCrypt) da entidade, DTOs e CRUD de Usuário.
+- [-] Edição de perfil não altera e-mail (`PUT /api/usuarios/{id}` aceita só nome e WhatsApp; o e-mail é a identidade confirmada por OTP).
+- [ ] Troca de e-mail com confirmação por OTP no novo endereço.
 
 ## Fase 3: Domínio de Anúncios (Peças)
 - [x] Criar Entidade e DTOs de Peça (Título, Descrição, Preço, Categoria, Modelo de Celular, ID do Vendedor).
@@ -35,3 +37,12 @@
 - [x] Remover o endpoint de login com senha (`POST /api/auth/login`).
 - [x] Proteger endpoints de escrita com JWT (apenas os endpoints de OTP e a leitura de peças são públicos).
 - [x] Usar o usuário do token como vendedor e restringir edição/exclusão/upload ao próprio dono.
+- [-] Limitar `POST /api/auth/solicitar-codigo` (60 s entre pedidos e 5 por hora por email, 20 por hora por IP; configurável em `app.otp.*`), respondendo 429 com `Retry-After`, e criar o usuário só ao validar o código (substitui o cadastro no momento do pedido).
+
+## Fase 6: Container e integração com o front
+- [-] CORS configurável por ambiente (`CORS_ALLOWED_ORIGINS`), com preflight sem token e `Retry-After`/`Location` expostos.
+- [-] Health check via Actuator (`/actuator/health` com probes de liveness/readiness; readiness inclui o banco).
+- [-] Dockerfile multi-stage (JDK 25 no build, JRE 25 no runtime, usuário não root, jar em camadas, `HEALTHCHECK`).
+- [-] `docker-compose.yml` para desenvolvimento local, com SQL Server local opcional (perfil `banco-local`).
+- [ ] Validar a imagem rodando contra o Azure SQL e publicar em registry (ACR/GHCR).
+- [-] Deploy contínuo: a cada push na `main` o GitHub Actions roda os testes, publica a imagem no GHCR e atualiza o Azure Container Apps (`peca-api`, escala a zero).

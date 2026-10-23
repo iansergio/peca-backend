@@ -20,7 +20,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, OtpProperties.class})
 public class SecurityConfig {
 
 	private static final int TAMANHO_MINIMO_SEGREDO = 32;
@@ -29,9 +29,13 @@ public class SecurityConfig {
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 		return http
 				.csrf(AbstractHttpConfigurer::disable)
+				// Usa o CorsConfigurationSource de CorsConfig; o preflight e resolvido antes da autorizacao.
+				.cors(Customizer.withDefaults())
 				.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/error").permitAll()
+						// Health check do container (liveness/readiness); os demais endpoints do actuator nao sao expostos.
+						.requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/auth/solicitar-codigo", "/api/auth/verificar-codigo").permitAll()
 						.requestMatchers(HttpMethod.GET, "/api/pecas", "/api/pecas/*").permitAll()
 						.anyRequest().authenticated())

@@ -1,17 +1,25 @@
 package com.peca.backend.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.matchesPattern;
+import static org.hamcrest.Matchers.startsWith;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.hasKey;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
 import com.peca.backend.email.EmailService;
+import com.peca.backend.usuario.UsuarioRepository;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -38,6 +46,9 @@ class SegurancaIntegrationTest {
 	@Autowired
 	private CodigoVerificacaoRepository codigoRepository;
 
+	@Autowired
+	private UsuarioRepository usuarioRepository;
+
 	// Evita conexao SMTP real; o codigo e lido direto do banco.
 	@MockitoBean
 	private EmailService emailService;
@@ -45,11 +56,21 @@ class SegurancaIntegrationTest {
 	private record Sessao(String authorization, String usuarioId) {
 	}
 
+	// Cada pedido usa um IP proprio (via X-Forwarded-For) para nao esbarrar no limite por IP entre testes.
+	private ResultActions solicitarCodigo(String email, String ip) throws Exception {
+		return mockMvc.perform(post("/api/auth/solicitar-codigo").contentType(MediaType.APPLICATION_JSON)
+				.header("X-Forwarded-For", ip)
+				.content("""
+						{"nome":"Maria Silva","email":"%s"}""".formatted(email)));
+	}
+
 	private void solicitarCodigo(String email) throws Exception {
-		mockMvc.perform(post("/api/auth/solicitar-codigo").contentType(MediaType.APPLICATION_JSON)
-						.content("""
-								{"nome":"Maria Silva","email":"%s"}""".formatted(email)))
-				.andExpect(status().isOk());
+		solicitarCodigo(email, ipAleatorio()).andExpect(status().isOk());
+	}
+
+	private static String ipAleatorio() {
+		ThreadLocalRandom random = ThreadLocalRandom.current();
+		return "10.%d.%d.%d".formatted(random.nextInt(256), random.nextInt(256), random.nextInt(1, 255));
 	}
 
 	private ResultActions verificarCodigo(String email, String codigo) throws Exception {
@@ -86,7 +107,8 @@ class SegurancaIntegrationTest {
 		mockMvc.perform(post("/api/pecas").contentType(MediaType.APPLICATION_JSON).content(PECA))
 				.andExpect(status().isUnauthorized());
 		mockMvc.perform(delete("/api/pecas/" + UUID.randomUUID())).andExpect(status().isUnauthorized());
-		mockMvc.perform(get("/api/usuarios")).andExpect(status().isUnauthorized());
+		mockMvc.perform(get("/api/usuarios/me")).andExpect(status().isUnauthorized());
+		mockMvc.perform(get("/api/usuarios/" + UUID.randomUUID())).andExpect(status().isUnauthorized());
 		mockMvc.perform(post("/api/usuarios").contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"nome":"Maria","email":"maria@email.com"}"""))
@@ -111,6 +133,48 @@ class SegurancaIntegrationTest {
 		verificarCodigo(email, codigoAtual(email))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.usuario.nome").value("Maria Silva"));
+	}
+
+	@Test
+	void solicitarCodigoSemVerificarNaoCriaUsuario() throws Exception {
+		String email = email();
+		solicitarCodigo(email);
+
+		assertThat(usuarioRepository.findByEmail(email)).isEmpty();
+		verificarCodigo(email, codigoAtual(email)).andExpect(status().isOk());
+		assertThat(usuarioRepository.findByEmail(email)).isPresent();
+	}
+
+	@Test
+	void novoPedidoAntesDoIntervaloMinimoRetorna429ComRetryAfter() throws Exception {
+		String email = email();
+		solicitarCodigo(email);
+		String codigo = codigoAtual(email);
+
+		solicitarCodigo(email, ipAleatorio())
+				.andExpect(status().isTooManyRequests())
+				.andExpect(header().string(HttpHeaders.RETRY_AFTER, matchesPattern("\\d+")))
+				.andExpect(jsonPath("$.status").value(429))
+				.andExpect(jsonPath("$.detail").value(startsWith("Muitas solicitacoes")));
+		// O pedido recusado nao gera codigo novo: o anterior continua valido.
+		assertThat(codigoAtual(email)).isEqualTo(codigo);
+	}
+
+	@Test
+	void limitePorIpRetorna429SemRevelarSeOEmailExiste() throws Exception {
+		String ip = ipAleatorio();
+		String cadastrado = email();
+		cadastrarELogar(cadastrado);
+		for (int i = 0; i < 20; i++) {
+			solicitarCodigo(email(), ip).andExpect(status().isOk());
+		}
+
+		String novo = solicitarCodigo(email(), ip).andExpect(status().isTooManyRequests())
+				.andExpect(header().exists(HttpHeaders.RETRY_AFTER))
+				.andReturn().getResponse().getContentAsString();
+		String existente = solicitarCodigo(cadastrado, ip).andExpect(status().isTooManyRequests())
+				.andReturn().getResponse().getContentAsString();
+		assertThat(JsonPath.<String>read(existente, "$.detail")).isEqualTo(JsonPath.read(novo, "$.detail"));
 	}
 
 	@Test
@@ -166,6 +230,53 @@ class SegurancaIntegrationTest {
 				.andExpect(status().isForbidden());
 		mockMvc.perform(delete("/api/pecas/" + id).header(HttpHeaders.AUTHORIZATION, dono))
 				.andExpect(status().isNoContent());
+	}
+
+	@Test
+	void usuarioSoLeOProprioPerfil() throws Exception {
+		String emailMaria = email();
+		Sessao maria = cadastrarELogar(emailMaria);
+		Sessao joao = cadastrarELogar(email());
+
+		mockMvc.perform(get("/api/usuarios/me").header(HttpHeaders.AUTHORIZATION, maria.authorization()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(maria.usuarioId()))
+				.andExpect(jsonPath("$.email").value(emailMaria));
+		mockMvc.perform(get("/api/usuarios/" + maria.usuarioId()).header(HttpHeaders.AUTHORIZATION, maria.authorization()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.email").value(emailMaria));
+		mockMvc.perform(get("/api/usuarios/" + maria.usuarioId()).header(HttpHeaders.AUTHORIZATION, joao.authorization()))
+				.andExpect(status().isForbidden())
+				.andExpect(content().string(not(containsString(emailMaria))));
+	}
+
+	@Test
+	void edicaoDePerfilNaoAlteraOEmail() throws Exception {
+		String emailMaria = email();
+		Sessao maria = cadastrarELogar(emailMaria);
+		Sessao joao = cadastrarELogar(email());
+		String perfil = """
+				{"nome":"Maria Souza","email":"%s","whatsapp":"11988887777"}""".formatted(email());
+
+		mockMvc.perform(put("/api/usuarios/" + maria.usuarioId()).header(HttpHeaders.AUTHORIZATION, maria.authorization())
+						.contentType(MediaType.APPLICATION_JSON).content(perfil))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.nome").value("Maria Souza"))
+				.andExpect(jsonPath("$.whatsapp").value("11988887777"))
+				.andExpect(jsonPath("$.email").value(emailMaria));
+		mockMvc.perform(get("/api/usuarios/me").header(HttpHeaders.AUTHORIZATION, maria.authorization()))
+				.andExpect(jsonPath("$.email").value(emailMaria));
+		mockMvc.perform(put("/api/usuarios/" + maria.usuarioId()).header(HttpHeaders.AUTHORIZATION, joao.authorization())
+						.contentType(MediaType.APPLICATION_JSON).content(perfil))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void listagemDeUsuariosNaoExisteMais() throws Exception {
+		String joao = cadastrarELogar(email()).authorization();
+
+		mockMvc.perform(get("/api/usuarios").header(HttpHeaders.AUTHORIZATION, joao))
+				.andExpect(status().isNotFound());
 	}
 
 	@Test

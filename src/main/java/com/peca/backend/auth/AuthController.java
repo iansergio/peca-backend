@@ -5,9 +5,13 @@ import com.peca.backend.auth.dto.SolicitarCodigoResponse;
 import com.peca.backend.auth.dto.TokenResponse;
 import com.peca.backend.auth.dto.VerificarCodigoRequest;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.headers.Header;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,14 +30,20 @@ public class AuthController {
 
 	@PostMapping("/solicitar-codigo")
 	@Operation(summary = "Envia um codigo de 6 digitos para o email",
-			description = "Nome e email sao obrigatorios. Se o email ainda nao estiver cadastrado, o usuario e criado "
-					+ "automaticamente com o nome informado (o nome de um usuario existente nao e alterado). "
-					+ "O codigo vale por 10 minutos e e enviado por email.")
+			description = "Nome e email sao obrigatorios. Se o email ainda nao estiver cadastrado, o usuario so e criado "
+					+ "quando o codigo for validado, com o nome informado (o nome de um usuario existente nao e alterado). "
+					+ "O codigo vale por 10 minutos e e enviado por email. Limites: 1 pedido a cada 60 segundos e "
+					+ "5 por hora para o mesmo email, e 20 por hora por IP.")
 	@ApiResponse(responseCode = "200", description = "Codigo gerado e enviado")
 	@ApiResponse(responseCode = "400", description = "Nome ausente ou email invalido")
+	@ApiResponse(responseCode = "429", description = "Limite de solicitacoes excedido; aguarde o tempo do header Retry-After",
+			headers = @Header(name = HttpHeaders.RETRY_AFTER, description = "Segundos ate poder solicitar de novo",
+					schema = @Schema(type = "integer")))
 	@ApiResponse(responseCode = "502", description = "Falha ao enviar o email com o codigo")
-	public SolicitarCodigoResponse solicitarCodigo(@Valid @RequestBody SolicitarCodigoRequest request) {
-		return service.solicitarCodigo(request);
+	public SolicitarCodigoResponse solicitarCodigo(@Valid @RequestBody SolicitarCodigoRequest request,
+			HttpServletRequest httpRequest) {
+		// Atras de proxy, o IP real vem do X-Forwarded-For (server.forward-headers-strategy=framework).
+		return service.solicitarCodigo(request, httpRequest.getRemoteAddr());
 	}
 
 	@PostMapping("/verificar-codigo")
