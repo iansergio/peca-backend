@@ -3,7 +3,7 @@
 ## Stack Tecnológica Obrigatória
 - Linguagem: Java 25 LTS.
 - Framework: Spring Boot 4.1.
-- Banco de Dados: PostgreSQL (via Supabase).
+- Banco de Dados: Azure SQL Database (migrations versionadas com Flyway).
 - Storage: Supabase Storage (para fotos).
 - Documentação da API: Swagger/OpenAPI.
 
