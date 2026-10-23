@@ -9,6 +9,7 @@
 - [x] Inicializar projeto Spring Boot 4.1 com Java 25 LTS.
 - [x] Configurar conexão com o banco de dados Supabase (PostgreSQL).
 - [x] Configurar o Swagger/OpenAPI para documentação (acessível via `/swagger-ui.html`).
+- [-] Migrar o banco para Azure SQL Database com migrations Flyway.
 
 ## Fase 2: Domínio de Usuários
 - [x] Criar Entidade e DTOs de Usuário (Nome, Email, WhatsApp). Email é o identificador único e obrigatório.
