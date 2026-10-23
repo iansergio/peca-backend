@@ -45,3 +45,4 @@
 - [-] Dockerfile multi-stage (JDK 25 no build, JRE 25 no runtime, usuário não root, jar em camadas, `HEALTHCHECK`).
 - [-] `docker-compose.yml` para desenvolvimento local, com SQL Server local opcional (perfil `banco-local`).
 - [ ] Validar a imagem rodando contra o Azure SQL e publicar em registry (ACR/GHCR).
+- [-] Deploy contínuo: a cada push na `main` o GitHub Actions roda os testes, publica a imagem no GHCR e atualiza o Azure Container Apps (`peca-api`, escala a zero).
