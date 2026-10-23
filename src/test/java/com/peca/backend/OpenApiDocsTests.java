@@ -24,6 +24,8 @@ class OpenApiDocsTests {
 				.andExpect(jsonPath("$.paths['/api/usuarios']").doesNotExist())
 				.andExpect(jsonPath("$.paths['/api/usuarios/me'].get").exists())
 				.andExpect(jsonPath("$.paths['/api/usuarios/{id}'].get.responses['403']").exists())
+				.andExpect(jsonPath("$.paths['/api/usuarios/{id}'].put.responses['409']").doesNotExist())
+				.andExpect(jsonPath("$.components.schemas.UsuarioRequest.properties.email").doesNotExist())
 				.andExpect(jsonPath("$.components.schemas.UsuarioResponse.properties.senha").doesNotExist())
 				.andExpect(jsonPath("$.components.schemas.UsuarioRequest.properties.senha").doesNotExist());
 	}

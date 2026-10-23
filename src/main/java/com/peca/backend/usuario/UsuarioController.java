@@ -59,14 +59,14 @@ public class UsuarioController {
 	}
 
 	@PutMapping("/{id}")
-	@Operation(summary = "Atualiza a propria conta")
+	@Operation(summary = "Atualiza a propria conta",
+			description = "Altera nome e WhatsApp. O email nao pode ser alterado (e a identidade confirmada por OTP).")
 	@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 	@ApiResponse(responseCode = "200", description = "Usuario atualizado")
 	@ApiResponse(responseCode = "400", description = "Dados invalidos")
 	@ApiResponse(responseCode = "401", description = "Token ausente ou invalido")
 	@ApiResponse(responseCode = "403", description = "Tentativa de alterar outra conta")
 	@ApiResponse(responseCode = "404", description = "Usuario nao encontrado")
-	@ApiResponse(responseCode = "409", description = "Email ja cadastrado")
 	public UsuarioResponse atualizar(@Parameter(description = "Id do usuario") @PathVariable UUID id,
 			@Valid @RequestBody UsuarioRequest request, @AuthenticationPrincipal Jwt jwt) {
 		return service.atualizar(id, request, UsuarioAutenticado.id(jwt));

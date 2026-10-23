@@ -1,7 +1,6 @@
 package com.peca.backend.usuario;
 
 import com.peca.backend.exception.AcessoNegadoException;
-import com.peca.backend.exception.ConflitoException;
 import com.peca.backend.exception.RecursoNaoEncontradoException;
 import com.peca.backend.usuario.dto.UsuarioRequest;
 import com.peca.backend.usuario.dto.UsuarioResponse;
@@ -45,11 +44,7 @@ public class UsuarioService {
 	public UsuarioResponse atualizar(UUID id, UsuarioRequest request, UUID usuarioLogadoId) {
 		exigirProprioUsuario(id, usuarioLogadoId);
 		Usuario usuario = buscarEntidade(id);
-		String email = normalizarEmail(request.email());
-		if (!email.equals(usuario.getEmail()) && repository.existsByEmail(email)) {
-			throw new ConflitoException("Email ja cadastrado");
-		}
-		aplicar(usuario, request, email);
+		aplicar(usuario, request);
 		return UsuarioResponse.from(repository.save(usuario));
 	}
 
@@ -70,9 +65,9 @@ public class UsuarioService {
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Usuario nao encontrado: " + id));
 	}
 
-	private void aplicar(Usuario usuario, UsuarioRequest request, String email) {
+	// O email nao e editavel: ele e a identidade confirmada por OTP.
+	private void aplicar(Usuario usuario, UsuarioRequest request) {
 		usuario.setNome(request.nome().trim());
-		usuario.setEmail(email);
 		usuario.setWhatsapp(request.whatsapp());
 	}
 

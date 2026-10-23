@@ -251,6 +251,27 @@ class SegurancaIntegrationTest {
 	}
 
 	@Test
+	void edicaoDePerfilNaoAlteraOEmail() throws Exception {
+		String emailMaria = email();
+		Sessao maria = cadastrarELogar(emailMaria);
+		Sessao joao = cadastrarELogar(email());
+		String perfil = """
+				{"nome":"Maria Souza","email":"%s","whatsapp":"11988887777"}""".formatted(email());
+
+		mockMvc.perform(put("/api/usuarios/" + maria.usuarioId()).header(HttpHeaders.AUTHORIZATION, maria.authorization())
+						.contentType(MediaType.APPLICATION_JSON).content(perfil))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.nome").value("Maria Souza"))
+				.andExpect(jsonPath("$.whatsapp").value("11988887777"))
+				.andExpect(jsonPath("$.email").value(emailMaria));
+		mockMvc.perform(get("/api/usuarios/me").header(HttpHeaders.AUTHORIZATION, maria.authorization()))
+				.andExpect(jsonPath("$.email").value(emailMaria));
+		mockMvc.perform(put("/api/usuarios/" + maria.usuarioId()).header(HttpHeaders.AUTHORIZATION, joao.authorization())
+						.contentType(MediaType.APPLICATION_JSON).content(perfil))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
 	void listagemDeUsuariosNaoExisteMais() throws Exception {
 		String joao = cadastrarELogar(email()).authorization();
 
