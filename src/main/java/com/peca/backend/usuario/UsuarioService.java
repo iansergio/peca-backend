@@ -5,7 +5,6 @@ import com.peca.backend.exception.ConflitoException;
 import com.peca.backend.exception.RecursoNaoEncontradoException;
 import com.peca.backend.usuario.dto.UsuarioRequest;
 import com.peca.backend.usuario.dto.UsuarioResponse;
-import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,12 +19,14 @@ public class UsuarioService {
 	}
 
 	@Transactional(readOnly = true)
-	public List<UsuarioResponse> listar() {
-		return repository.findAll().stream().map(UsuarioResponse::from).toList();
+	public UsuarioResponse buscarAtual(UUID usuarioLogadoId) {
+		return UsuarioResponse.from(buscarEntidade(usuarioLogadoId));
 	}
 
+	// O perfil inclui email e so pode ser lido pelo proprio usuario.
 	@Transactional(readOnly = true)
-	public UsuarioResponse buscarPorId(UUID id) {
+	public UsuarioResponse buscarPorId(UUID id, UUID usuarioLogadoId) {
+		exigirProprioUsuario(id, usuarioLogadoId);
 		return UsuarioResponse.from(buscarEntidade(id));
 	}
 
@@ -49,7 +50,7 @@ public class UsuarioService {
 
 	private static void exigirProprioUsuario(UUID id, UUID usuarioLogadoId) {
 		if (!id.equals(usuarioLogadoId)) {
-			throw new AcessoNegadoException("Voce so pode alterar a sua propria conta");
+			throw new AcessoNegadoException("Voce so pode acessar ou alterar a sua propria conta");
 		}
 	}
 

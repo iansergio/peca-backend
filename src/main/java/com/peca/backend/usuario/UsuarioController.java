@@ -10,7 +10,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -34,23 +33,29 @@ public class UsuarioController {
 		this.service = service;
 	}
 
-	@GetMapping
-	@Operation(summary = "Lista todos os usuarios")
+	// Mapping literal: o Spring prioriza /me sobre o padrao /{id}.
+	@GetMapping("/me")
+	@Operation(summary = "Retorna o perfil do usuario logado",
+			description = "Usa o usuario do token. Dados publicos de outros vendedores saem apenas em PecaResponse.vendedor (sem email).")
 	@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
-	@ApiResponse(responseCode = "200", description = "Lista de usuarios")
+	@ApiResponse(responseCode = "200", description = "Perfil do usuario logado")
 	@ApiResponse(responseCode = "401", description = "Token ausente ou invalido")
-	public List<UsuarioResponse> listar() {
-		return service.listar();
+	@ApiResponse(responseCode = "404", description = "Usuario do token nao existe mais")
+	public UsuarioResponse buscarAtual(@AuthenticationPrincipal Jwt jwt) {
+		return service.buscarAtual(UsuarioAutenticado.id(jwt));
 	}
 
 	@GetMapping("/{id}")
-	@Operation(summary = "Busca um usuario pelo id")
+	@Operation(summary = "Busca a propria conta pelo id",
+			description = "So o proprio usuario pode ler o seu perfil; prefira GET /api/usuarios/me.")
 	@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 	@ApiResponse(responseCode = "200", description = "Usuario encontrado")
 	@ApiResponse(responseCode = "401", description = "Token ausente ou invalido")
+	@ApiResponse(responseCode = "403", description = "Tentativa de ler outra conta")
 	@ApiResponse(responseCode = "404", description = "Usuario nao encontrado")
-	public UsuarioResponse buscarPorId(@Parameter(description = "Id do usuario") @PathVariable UUID id) {
-		return service.buscarPorId(id);
+	public UsuarioResponse buscarPorId(@Parameter(description = "Id do usuario") @PathVariable UUID id,
+			@AuthenticationPrincipal Jwt jwt) {
+		return service.buscarPorId(id, UsuarioAutenticado.id(jwt));
 	}
 
 	@PutMapping("/{id}")

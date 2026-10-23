@@ -1,11 +1,13 @@
 package com.peca.backend.auth;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.hasKey;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -86,7 +88,8 @@ class SegurancaIntegrationTest {
 		mockMvc.perform(post("/api/pecas").contentType(MediaType.APPLICATION_JSON).content(PECA))
 				.andExpect(status().isUnauthorized());
 		mockMvc.perform(delete("/api/pecas/" + UUID.randomUUID())).andExpect(status().isUnauthorized());
-		mockMvc.perform(get("/api/usuarios")).andExpect(status().isUnauthorized());
+		mockMvc.perform(get("/api/usuarios/me")).andExpect(status().isUnauthorized());
+		mockMvc.perform(get("/api/usuarios/" + UUID.randomUUID())).andExpect(status().isUnauthorized());
 		mockMvc.perform(post("/api/usuarios").contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"nome":"Maria","email":"maria@email.com"}"""))
@@ -166,6 +169,32 @@ class SegurancaIntegrationTest {
 				.andExpect(status().isForbidden());
 		mockMvc.perform(delete("/api/pecas/" + id).header(HttpHeaders.AUTHORIZATION, dono))
 				.andExpect(status().isNoContent());
+	}
+
+	@Test
+	void usuarioSoLeOProprioPerfil() throws Exception {
+		String emailMaria = email();
+		Sessao maria = cadastrarELogar(emailMaria);
+		Sessao joao = cadastrarELogar(email());
+
+		mockMvc.perform(get("/api/usuarios/me").header(HttpHeaders.AUTHORIZATION, maria.authorization()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(maria.usuarioId()))
+				.andExpect(jsonPath("$.email").value(emailMaria));
+		mockMvc.perform(get("/api/usuarios/" + maria.usuarioId()).header(HttpHeaders.AUTHORIZATION, maria.authorization()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.email").value(emailMaria));
+		mockMvc.perform(get("/api/usuarios/" + maria.usuarioId()).header(HttpHeaders.AUTHORIZATION, joao.authorization()))
+				.andExpect(status().isForbidden())
+				.andExpect(content().string(not(containsString(emailMaria))));
+	}
+
+	@Test
+	void listagemDeUsuariosNaoExisteMais() throws Exception {
+		String joao = cadastrarELogar(email()).authorization();
+
+		mockMvc.perform(get("/api/usuarios").header(HttpHeaders.AUTHORIZATION, joao))
+				.andExpect(status().isNotFound());
 	}
 
 	@Test

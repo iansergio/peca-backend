@@ -50,7 +50,34 @@ class UsuarioServiceTest {
 		UUID id = UUID.randomUUID();
 		when(repository.findById(id)).thenReturn(Optional.empty());
 
-		assertThatThrownBy(() -> service.buscarPorId(id))
+		assertThatThrownBy(() -> service.buscarPorId(id, id))
+				.isInstanceOf(RecursoNaoEncontradoException.class);
+	}
+
+	@Test
+	void buscarPorIdDeveFalharQuandoUsuarioLogadoEhOutro() {
+		assertThatThrownBy(() -> service.buscarPorId(UUID.randomUUID(), UUID.randomUUID()))
+				.isInstanceOf(AcessoNegadoException.class);
+		verify(repository, never()).findById(any());
+	}
+
+	@Test
+	void buscarAtualDeveRetornarOUsuarioDoToken() {
+		UUID id = UUID.randomUUID();
+		when(repository.findById(id)).thenReturn(Optional.of(usuarioExistente(id, "maria@email.com")));
+
+		UsuarioResponse response = service.buscarAtual(id);
+
+		assertThat(response.id()).isEqualTo(id);
+		assertThat(response.email()).isEqualTo("maria@email.com");
+	}
+
+	@Test
+	void buscarAtualDeveFalharQuandoUsuarioDoTokenNaoExisteMais() {
+		UUID id = UUID.randomUUID();
+		when(repository.findById(id)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.buscarAtual(id))
 				.isInstanceOf(RecursoNaoEncontradoException.class);
 	}
 
