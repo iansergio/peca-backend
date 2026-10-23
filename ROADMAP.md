@@ -35,3 +35,4 @@
 - [x] Remover o endpoint de login com senha (`POST /api/auth/login`).
 - [x] Proteger endpoints de escrita com JWT (apenas os endpoints de OTP e a leitura de peças são públicos).
 - [x] Usar o usuário do token como vendedor e restringir edição/exclusão/upload ao próprio dono.
+- [-] Limitar `POST /api/auth/solicitar-codigo` (60 s entre pedidos e 5 por hora por email, 20 por hora por IP; configurável em `app.otp.*`), respondendo 429 com `Retry-After`, e criar o usuário só ao validar o código (substitui o cadastro no momento do pedido).
