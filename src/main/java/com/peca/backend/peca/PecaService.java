@@ -89,12 +89,14 @@ public class PecaService {
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Peca nao encontrada: " + id));
 	}
 
+	// O contato do anuncio e o WhatsApp do vendedor, exibido publicamente em PecaResponse.vendedor.
 	private static void aplicar(Peca peca, PecaRequest request) {
 		peca.setTitulo(request.titulo().trim());
 		peca.setDescricao(request.descricao());
 		peca.setPreco(request.preco());
 		peca.setCategoria(request.categoria().trim());
 		peca.setModeloCelular(request.modeloCelular().trim());
+		peca.getVendedor().setWhatsapp(request.whatsapp());
 	}
 
 }

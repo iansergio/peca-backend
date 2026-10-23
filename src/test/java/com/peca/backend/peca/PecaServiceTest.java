@@ -53,7 +53,7 @@ class PecaServiceTest {
 	}
 
 	private static PecaRequest request() {
-		return new PecaRequest(" Tela iPhone 13 ", "Original", new BigDecimal("450.00"), "Tela", "iPhone 13");
+		return new PecaRequest(" Tela iPhone 13 ", "Original", new BigDecimal("450.00"), "Tela", "iPhone 13", "11988887777");
 	}
 
 	private static Peca pecaExistente(UUID id, Usuario vendedor) {
@@ -78,7 +78,7 @@ class PecaServiceTest {
 		assertThat(response.titulo()).isEqualTo("Tela iPhone 13");
 		assertThat(response.vendedor().id()).isEqualTo(vendedorId);
 		assertThat(response.vendedor().nome()).isEqualTo("Maria Silva");
-		assertThat(response.vendedor().whatsapp()).isEqualTo("11999998888");
+		assertThat(response.vendedor().whatsapp()).isEqualTo("11988887777");
 	}
 
 	@Test
