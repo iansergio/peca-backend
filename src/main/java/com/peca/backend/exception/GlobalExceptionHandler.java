@@ -6,8 +6,10 @@ import com.peca.backend.storage.ArmazenamentoException;
 import com.peca.backend.storage.ImagemInvalidaException;
 import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -30,6 +32,13 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(CodigoInvalidoException.class)
 	public ProblemDetail handleCodigoInvalido(CodigoInvalidoException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+	}
+
+	@ExceptionHandler(LimiteExcedidoException.class)
+	public ResponseEntity<ProblemDetail> handleLimiteExcedido(LimiteExcedidoException ex) {
+		return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+				.header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getSegundosParaNovaTentativa()))
+				.body(ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage()));
 	}
 
 	@ExceptionHandler(AcessoNegadoException.class)

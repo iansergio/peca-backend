@@ -57,6 +57,7 @@ class OpenApiDocsTests {
 				.andExpect(jsonPath("$.paths['/api/pecas'].post.security[0].bearerAuth").exists())
 				.andExpect(jsonPath("$.paths['/api/pecas'].get.security").doesNotExist())
 				.andExpect(jsonPath("$.paths['/api/auth/solicitar-codigo'].post").exists())
+				.andExpect(jsonPath("$.paths['/api/auth/solicitar-codigo'].post.responses['429'].headers['Retry-After']").exists())
 				.andExpect(jsonPath("$.paths['/api/auth/verificar-codigo'].post").exists())
 				.andExpect(jsonPath("$.paths['/api/auth/login']").doesNotExist())
 				.andExpect(jsonPath("$.components.schemas.PecaRequest.properties.vendedorId").doesNotExist());

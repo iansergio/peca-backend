@@ -7,6 +7,7 @@ import com.peca.backend.usuario.dto.UsuarioRequest;
 import com.peca.backend.usuario.dto.UsuarioResponse;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -28,6 +29,16 @@ public class UsuarioService {
 	public UsuarioResponse buscarPorId(UUID id, UUID usuarioLogadoId) {
 		exigirProprioUsuario(id, usuarioLogadoId);
 		return UsuarioResponse.from(buscarEntidade(id));
+	}
+
+	// Transacao propria: se uma requisicao concorrente ja cadastrou o email, a violacao da unique
+	// nao inutiliza a transacao de quem chamou, que pode entao buscar o usuario existente.
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
+	public Usuario cadastrar(String nome, String email) {
+		Usuario usuario = new Usuario();
+		usuario.setNome(nome.trim());
+		usuario.setEmail(normalizarEmail(email));
+		return repository.saveAndFlush(usuario);
 	}
 
 	@Transactional
