@@ -1,0 +1,68 @@
+# Build e deploy do backend no Azure App Service (Java SE) a cada push na main.
+#
+# Pre-requisitos no Azure / GitHub:
+# 1. Web App "peca-backend" com stack Java 25 (Java SE) no Azure App Service.
+# 2. Secret do repositorio AZUREAPPSERVICE_PUBLISHPROFILE com o conteudo do perfil de publicacao
+#    (Portal do Azure > Web App > Visao geral > Baixar perfil de publicacao).
+# 3. Variaveis de ambiente da aplicacao (DB_URL, DB_USERNAME, DB_PASSWORD, SUPABASE_*, JWT_SECRET, MAIL_*)
+#    configuradas em Web App > Configuracoes > Variaveis de ambiente. Nunca coloque segredos neste arquivo.
+
+name: Build e deploy no Azure Web App - peca-backend
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: peca-backend
+  JAVA_VERSION: '25'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configura o Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'microsoft'
+          cache: 'maven'
+
+      # Os testes usam H2 em memoria (src/test/resources), entao nao precisam de banco real.
+      - name: Compila e testa com Maven
+        run: ./mvnw -B clean package
+
+      - name: Publica o jar para o job de deploy
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-app
+          path: target/*.jar
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+
+    steps:
+      - name: Baixa o jar do job de build
+        uses: actions/download-artifact@v4
+        with:
+          name: java-app
+
+      - name: Deploy no Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          slot-name: 'Production'
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
+          package: '*.jar'
