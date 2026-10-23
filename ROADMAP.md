@@ -13,7 +13,7 @@
 
 ## Fase 2: Domínio de Usuários
 - [x] Criar Entidade e DTOs de Usuário (Nome, Email, WhatsApp). Email é o identificador único e obrigatório.
-- [x] Criar endpoints de perfil de Usuário (listar, buscar, editar e remover a própria conta). O cadastro é feito apenas via OTP (Fase 5); não existe mais `POST /api/usuarios`.
+- [-] Criar endpoints de perfil de Usuário restritos à própria conta: `GET /api/usuarios/me`, buscar (`GET /api/usuarios/{id}`, 403 para outro id), editar e remover. Não existe listagem de usuários; dados públicos do vendedor saem só em `PecaResponse.vendedor` (sem email). O cadastro é feito apenas via OTP (Fase 5); não existe mais `POST /api/usuarios`.
 - [x] Remover o campo Senha (e o hash BCrypt) da entidade, DTOs e CRUD de Usuário.
 
 ## Fase 3: Domínio de Anúncios (Peças)
