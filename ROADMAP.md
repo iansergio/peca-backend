@@ -38,3 +38,10 @@
 - [x] Proteger endpoints de escrita com JWT (apenas os endpoints de OTP e a leitura de peças são públicos).
 - [x] Usar o usuário do token como vendedor e restringir edição/exclusão/upload ao próprio dono.
 - [-] Limitar `POST /api/auth/solicitar-codigo` (60 s entre pedidos e 5 por hora por email, 20 por hora por IP; configurável em `app.otp.*`), respondendo 429 com `Retry-After`, e criar o usuário só ao validar o código (substitui o cadastro no momento do pedido).
+
+## Fase 6: Container e integração com o front
+- [-] CORS configurável por ambiente (`CORS_ALLOWED_ORIGINS`), com preflight sem token e `Retry-After`/`Location` expostos.
+- [-] Health check via Actuator (`/actuator/health` com probes de liveness/readiness; readiness inclui o banco).
+- [-] Dockerfile multi-stage (JDK 25 no build, JRE 25 no runtime, usuário não root, jar em camadas, `HEALTHCHECK`).
+- [-] `docker-compose.yml` para desenvolvimento local, com SQL Server local opcional (perfil `banco-local`).
+- [ ] Validar a imagem rodando contra o Azure SQL e publicar em registry (ACR/GHCR).
