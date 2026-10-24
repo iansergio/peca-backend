@@ -132,6 +132,32 @@ class AuthServiceTest {
 	}
 
 	@Test
+	void loginSemNomeDeUsuarioExistenteEnviaOCodigo() {
+		Usuario existente = usuario(UUID.randomUUID());
+		when(usuarioRepository.findByEmail("maria@email.com")).thenReturn(Optional.of(existente));
+
+		solicitar(null, "maria@email.com");
+
+		ArgumentCaptor<CodigoVerificacao> codigo = ArgumentCaptor.forClass(CodigoVerificacao.class);
+		verify(codigoRepository).save(codigo.capture());
+		assertThat(codigo.getValue().getUsuario()).isSameAs(existente);
+		assertThat(codigo.getValue().getNome()).isNull();
+		verify(emailService).enviarCodigoOtp("maria@email.com", codigo.getValue().getCodigo());
+	}
+
+	@Test
+	void loginSemNomeDeEmailSemContaRespondeIgualSemGerarNemEnviarCodigo() {
+		when(usuarioRepository.findByEmail("maria@email.com")).thenReturn(Optional.empty());
+
+		SolicitarCodigoResponse response = solicitar("  ", "maria@email.com");
+
+		assertThat(response.mensagem()).isEqualTo("Codigo enviado para o email informado");
+		assertThat(response.expiraEm()).isEqualTo(AGORA_LOCAL.plusMinutes(10));
+		verify(codigoRepository, never()).save(any());
+		verify(emailService, never()).enviarCodigoOtp(any(), any());
+	}
+
+	@Test
 	void falhaNoEnvioDoEmailDevePropagarErro() {
 		Usuario existente = usuario(UUID.randomUUID());
 		when(usuarioRepository.findByEmail("maria@email.com")).thenReturn(Optional.of(existente));

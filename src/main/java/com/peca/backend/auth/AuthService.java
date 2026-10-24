@@ -33,6 +33,7 @@ public class AuthService {
 
 	static final Duration VALIDADE_CODIGO = Duration.ofMinutes(10);
 	static final int MAX_TENTATIVAS = 5;
+	private static final String MENSAGEM_ENVIADO = "Codigo enviado para o email informado";
 	private final UsuarioRepository usuarioRepository;
 	private final UsuarioService usuarioService;
 	private final CodigoVerificacaoRepository codigoRepository;
@@ -79,6 +80,12 @@ public class AuthService {
 
 		// Email sem conta nao gera cadastro aqui: o nome fica guardado no codigo ate a verificacao.
 		Usuario usuario = usuarioRepository.findByEmail(email).orElse(null);
+		boolean semNome = request.nome() == null || request.nome().isBlank();
+		if (usuario == null && semNome) {
+			// Login de um email sem conta: sem nome nao ha como cadastrar, entao nenhum codigo e gerado nem
+			// enviado. A resposta e a mesma de um envio real para nao revelar se o email esta cadastrado.
+			return new SolicitarCodigoResponse(MENSAGEM_ENVIADO, agora.plus(VALIDADE_CODIGO));
+		}
 
 		// Apenas o codigo mais recente fica valido.
 		codigoRepository.findByEmailAndUtilizadoFalse(email).forEach(antigo -> antigo.setUtilizado(true));
@@ -96,7 +103,7 @@ public class AuthService {
 
 		// Dentro da transacao: se o envio falhar, o codigo e desfeito.
 		emailService.enviarCodigoOtp(email, codigo.getCodigo());
-		return new SolicitarCodigoResponse("Codigo enviado para o email informado", codigo.getExpiraEm());
+		return new SolicitarCodigoResponse(MENSAGEM_ENVIADO, codigo.getExpiraEm());
 	}
 
 	// Cooldown entre pedidos e limite por hora do mesmo email. Com 5 codigos/hora e 5 tentativas
