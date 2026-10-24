@@ -118,12 +118,40 @@ class SegurancaIntegrationTest {
 				.andExpect(status().isUnauthorized());
 	}
 
+	private ResultActions solicitarCodigoSemNome(String email) throws Exception {
+		return mockMvc.perform(post("/api/auth/solicitar-codigo").contentType(MediaType.APPLICATION_JSON)
+				.header("X-Forwarded-For", ipAleatorio())
+				.content("""
+						{"email":"%s"}""".formatted(email)));
+	}
+
 	@Test
-	void solicitarCodigoSemNomeRetorna400() throws Exception {
-		mockMvc.perform(post("/api/auth/solicitar-codigo").contentType(MediaType.APPLICATION_JSON)
-						.content("""
-								{"email":"%s"}""".formatted(email())))
-				.andExpect(status().isBadRequest());
+	void loginSemNomeDeUsuarioCadastradoEnviaCodigoValido() throws Exception {
+		String email = email();
+		cadastrarELogar(email);
+		// Recua o pedido do cadastro para passar do intervalo minimo entre pedidos do mesmo email.
+		codigoRepository.findAll().stream().filter(codigo -> codigo.getEmail().equals(email)).forEach(codigo -> {
+			codigo.setCriadoEm(codigo.getCriadoEm().minusMinutes(2));
+			codigoRepository.save(codigo);
+		});
+
+		solicitarCodigoSemNome(email).andExpect(status().isOk());
+		verificarCodigo(email, codigoAtual(email))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.usuario.nome").value("Maria Silva"));
+	}
+
+	@Test
+	void loginSemNomeDeEmailSemContaRespondeOkSemGerarCodigo() throws Exception {
+		String email = email();
+		solicitarCodigoSemNome(email).andExpect(status().isOk());
+		assertThat(codigoRepository.findByEmailAndUtilizadoFalse(email)).isEmpty();
+		assertThat(usuarioRepository.findByEmail(email)).isEmpty();
+	}
+
+	@Test
+	void solicitarCodigoComEmailInvalidoRetorna400() throws Exception {
+		solicitarCodigoSemNome("nao-e-email").andExpect(status().isBadRequest());
 	}
 
 	@Test
