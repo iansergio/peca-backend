@@ -59,7 +59,7 @@ Dicas para o `.env`: não coloque aspas nos valores. Se uma senha tiver `$`, esc
 | `MAIL_FROM` | não | Remetente exibido. Padrão `MAIL_USERNAME` |
 | `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` | sim | Supabase Storage (upload das imagens) |
 | `SUPABASE_STORAGE_BUCKET` | não | Bucket público. Padrão `pecas` |
-| `CORS_ALLOWED_ORIGINS` | sim, para o front | Origens do front-end separadas por vírgula (ex: `https://peca.app,http://localhost:5173`). `*` não é aceito. Vazio = nenhuma origem liberada |
+| `CORS_ALLOWED_ORIGINS` | não | Origens liberadas para chamar a API pelo navegador, separadas por vírgula (ex: `https://peca.app,http://localhost:3000`). `*` não é aceito. Vazio = nenhuma origem liberada. O `peca-front-end` (Next.js) chama a API só pelo servidor e não precisa de CORS |
 | `PORT` | não | Porta HTTP. Padrão `8080` |
 | `JAVA_OPTS` | não | Opções da JVM no container. Padrão `-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError` (definir substitui o padrão) |
 | `MSSQL_SA_PASSWORD` | só `banco-local` | Senha do `sa` do SQL Server local do Compose |

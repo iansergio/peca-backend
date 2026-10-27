@@ -2,8 +2,8 @@
 
 ## Regra de Preenchimento
 - [ ] Pendente
-- [-] Implementado, testes passando, mas aguardando teste humano no Swagger/Postman[cite: 2].
-- [x] Testado pelo humano e aprovado[cite: 2].
+- [-] Implementado, testes passando, mas aguardando teste humano no Swagger/Postman.
+- [x] Testado pelo humano e aprovado.
 
 ## Fase 1: Setup e Infraestrutura
 - [x] Inicializar projeto Spring Boot 4.1 com Java 25 LTS.
@@ -31,7 +31,7 @@
 ## Fase 5: Autenticação (Passwordless OTP + JWT)
 - [x] Criar a entidade `CodigoVerificacao` (código OTP de 6 dígitos vinculado ao email, com expiração).
 - [x] Criar endpoint para solicitar código OTP por email (`POST /api/auth/solicitar-codigo`, cria o usuário se ele ainda não existir).
-- [-] Nome do usuário ao solicitar o código OTP: obrigatório só no cadastro (email sem conta). No login de um usuário existente basta o email; email sem conta e sem nome responde 200 sem gerar nem enviar código, para não revelar quais emails estão cadastrados. O nome não sobrescreve o de um usuário existente.
+- [-] Nome do usuário ao solicitar o código OTP: obrigatório só no cadastro (email sem conta). No login de um usuário existente basta o email; email sem conta e sem nome responde 200 sem gerar nem enviar código, para não revelar quais emails estão cadastrados. O nome não sobrescreve o de um usuário existente. O `peca-front-end` já removeu o contorno que tratava o antigo 400 como envio neutro.
 - [x] Enviar o código OTP por email real via SMTP (`spring-boot-starter-mail` + `EmailService`), substituindo a simulação no console. Credenciais via `MAIL_*` no `.env`.
 - [x] Criar endpoint para validar o código OTP e emitir o token JWT (`POST /api/auth/verificar-codigo`).
 - [x] Remover o endpoint de login com senha (`POST /api/auth/login`).
@@ -40,7 +40,7 @@
 - [-] Limitar `POST /api/auth/solicitar-codigo` (60 s entre pedidos e 5 por hora por email, 20 por hora por IP; configurável em `app.otp.*`), respondendo 429 com `Retry-After`, e criar o usuário só ao validar o código (substitui o cadastro no momento do pedido).
 
 ## Fase 6: Container e integração com o front
-- [-] CORS configurável por ambiente (`CORS_ALLOWED_ORIGINS`), com preflight sem token e `Retry-After`/`Location` expostos.
+- [-] CORS configurável por ambiente (`CORS_ALLOWED_ORIGINS`), com preflight sem token e `Retry-After`/`Location` expostos. Opcional: o front Next.js chama a API pelo servidor e não depende de CORS.
 - [-] Health check via Actuator (`/actuator/health` com probes de liveness/readiness; readiness inclui o banco).
 - [-] Dockerfile multi-stage (JDK 25 no build, JRE 25 no runtime, usuário não root, jar em camadas, `HEALTHCHECK`).
 - [-] `docker-compose.yml` para desenvolvimento local, com SQL Server local opcional (perfil `banco-local`).
