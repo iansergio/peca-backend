@@ -67,4 +67,10 @@ Dicas para o `.env`: não coloque aspas nos valores. Se uma senha tiver `$`, esc
 ## URLs
 
 - Swagger UI: `http://localhost:8080/swagger-ui.html` (OpenAPI em `/v3/api-docs`)
-- Health: `http://localhost:8080/actuator/health`, com as probes `/actuator/health/liveness` e `/actuator/health/readiness`. A readiness inclui o banco e fica `DOWN` (HTTP 503) se ele estiver inacessível. É ela que o `HEALTHCHECK` da imagem usa.
+- Health: `http://localhost:8080/actuator/health`, com as probes `/actuator/health/liveness` e `/actuator/health/readiness`. A readiness inclui o banco e fica `DOWN` (HTTP 503) se ele estiver inacessível. É ela que o `HEALTHCHECK` da imagem Docker local usa; no App Service o health check usa `/actuator/health`.
+
+## Deploy
+
+Azure App Service (Java SE 25, Linux), app `peca-backend`. A cada push na `main`, o workflow `.github/workflows/main_peca-backend.yml` roda os testes, gera o JAR e publica no App Service. Em todo PR para a `main`, o `.github/workflows/verificacao.yml` roda os testes e o build, sem deploy.
+
+No App Service, `PORT` é definida pela plataforma (não configure) e o padrão de `JAVA_OPTS` acima vale só para a imagem Docker local. App Settings, porta, health check e rollback estão em [docs/deploy-azure.md](docs/deploy-azure.md).
