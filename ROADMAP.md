@@ -39,10 +39,10 @@
 - [x] Usar o usuário do token como vendedor e restringir edição/exclusão/upload ao próprio dono.
 - [-] Limitar `POST /api/auth/solicitar-codigo` (60 s entre pedidos e 5 por hora por email, 20 por hora por IP; configurável em `app.otp.*`), respondendo 429 com `Retry-After`, e criar o usuário só ao validar o código (substitui o cadastro no momento do pedido).
 
-## Fase 6: Container e integração com o front
+## Fase 6: Deploy e integração com o front
 - [-] CORS configurável por ambiente (`CORS_ALLOWED_ORIGINS`), com preflight sem token e `Retry-After`/`Location` expostos. Opcional: o front Next.js chama a API pelo servidor e não depende de CORS.
-- [-] Health check via Actuator (`/actuator/health` com probes de liveness/readiness; readiness inclui o banco).
-- [-] Dockerfile multi-stage (JDK 25 no build, JRE 25 no runtime, usuário não root, jar em camadas, `HEALTHCHECK`).
-- [-] `docker-compose.yml` para desenvolvimento local, com SQL Server local opcional (perfil `banco-local`).
-- [ ] Validar a imagem rodando contra o Azure SQL e publicar em registry (ACR/GHCR).
-- [-] Deploy contínuo: a cada push na `main` o GitHub Actions roda os testes, publica a imagem no GHCR e atualiza o Azure Container Apps (`peca-api`, escala a zero).
+- [-] Health check via Actuator (`/actuator/health` com probes de liveness/readiness; readiness inclui o banco), usado no Health check do App Service.
+- [-] Dockerfile multi-stage e `docker-compose.yml` só para desenvolvimento local (produção roda o JAR no App Service).
+- [-] Deploy contínuo no Azure App Service (Java SE 25, app `peca-backend`): a cada push na `main`, `main_peca-backend.yml` roda `./mvnw -B clean package` com cache do Maven e publica o JAR (um deploy por vez). Em todo PR para a `main`, `verificacao.yml` roda testes e build sem deploy.
+- [-] Documentação do deploy (`docs/deploy-azure.md`): App Settings, porta definida pela plataforma (`PORT`), health check em `/actuator/health`, IP do cliente e rollback.
+- [ ] Configurar as App Settings e o Health check no portal e validar o deploy no App Service contra o Supabase real.
