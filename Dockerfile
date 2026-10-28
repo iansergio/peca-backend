@@ -40,7 +40,7 @@ ENV TZ=UTC \
     JAVA_OPTS="-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError"
 EXPOSE 8080
 
-# start-period longo: o Azure SQL serverless pode levar ate 1 minuto para acordar.
+# start-period com folga para a JVM subir e o Flyway aplicar as migrations.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
     CMD wget -q -O /dev/null "http://localhost:${PORT:-8080}/actuator/health/readiness" || exit 1
 

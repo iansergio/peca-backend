@@ -1,6 +1,6 @@
 # Desenvolvimento local. Le as variaveis do .env (veja .env.example e o README).
-#   API contra o Azure SQL:       docker compose up --build
-#   API com SQL Server local:     docker compose --profile banco-local up --build
+#   API contra o PostgreSQL do Supabase:  docker compose up --build
+#   API com PostgreSQL local:             docker compose --profile banco-local up --build
 
 services:
   api:
@@ -18,40 +18,29 @@ services:
       retries: 3
     depends_on:
       # So vale com o perfil banco-local; sem ele a dependencia e ignorada.
-      sqlserver-init:
-        condition: service_completed_successfully
+      postgres-local:
+        condition: service_healthy
         required: false
 
-  # Opcional: SQL Server local para rodar sem o Azure. A senha vem de MSSQL_SA_PASSWORD no .env.
-  sqlserver-local:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+  # Opcional: PostgreSQL local para rodar sem o Supabase. O banco "peca" e criado na primeira subida;
+  # as tabelas sao criadas pelo Flyway. A senha vem de POSTGRES_PASSWORD no .env.
+  postgres-local:
+    image: postgres:17-alpine
     profiles: ["banco-local"]
     environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-}
+      POSTGRES_DB: peca
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
     ports:
-      - "1433:1433"
+      - "5432:5432"
     volumes:
-      - sqlserver-dados:/var/opt/mssql
+      - postgres-dados:/var/lib/postgresql/data
     healthcheck:
-      # -C confia no certificado autoassinado do container (apenas uso local).
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -b -Q 'SELECT 1' -o /dev/null"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U postgres -d peca"]
+      interval: 5s
       timeout: 5s
-      start_period: 20s
+      start_period: 10s
       retries: 12
 
-  # Cria o banco "peca" na primeira vez (idempotente) e termina. As tabelas sao criadas pelo Flyway.
-  sqlserver-init:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    profiles: ["banco-local"]
-    depends_on:
-      sqlserver-local:
-        condition: service_healthy
-    environment:
-      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-}
-    entrypoint: ["/bin/sh", "-c", "/opt/mssql-tools18/bin/sqlcmd -C -S sqlserver-local -U sa -P \"$$MSSQL_SA_PASSWORD\" -b -Q \"IF DB_ID('peca') IS NULL CREATE DATABASE peca\""]
-    restart: "no"
-
 volumes:
-  sqlserver-dados:
+  postgres-dados:
