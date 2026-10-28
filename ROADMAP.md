@@ -32,7 +32,7 @@
 - [x] Criar a entidade `CodigoVerificacao` (código OTP de 6 dígitos vinculado ao email, com expiração).
 - [x] Criar endpoint para solicitar código OTP por email (`POST /api/auth/solicitar-codigo`, cria o usuário se ele ainda não existir).
 - [-] Nome do usuário ao solicitar o código OTP: obrigatório só no cadastro (email sem conta). No login de um usuário existente basta o email; email sem conta e sem nome responde 200 sem gerar nem enviar código, para não revelar quais emails estão cadastrados. O nome não sobrescreve o de um usuário existente. O `peca-front-end` já removeu o contorno que tratava o antigo 400 como envio neutro.
-- [x] Enviar o código OTP por email real via SMTP (`spring-boot-starter-mail` + `EmailService`), substituindo a simulação no console. Localmente, o SMTP é o Mailpit do Docker Compose (caixa de entrada em http://localhost:8025).
+- [x] Enviar o código OTP por email real via SMTP (`spring-boot-starter-mail` + `EmailService`), substituindo a simulação no console. Credenciais via `MAIL_*` no `.env` (Gmail com senha de app); sem elas, os emails vão para o Mailpit do Docker Compose (http://localhost:8025).
 - [x] Criar endpoint para validar o código OTP e emitir o token JWT (`POST /api/auth/verificar-codigo`).
 - [x] Remover o endpoint de login com senha (`POST /api/auth/login`).
 - [x] Proteger endpoints de escrita com JWT (apenas os endpoints de OTP e a leitura de peças são públicos).

@@ -3,7 +3,7 @@
 #   docker compose up --build
 #     Front-end: http://localhost:3000
 #     API/Swagger: http://localhost:8080/swagger-ui.html
-#     Emails (codigos OTP): http://localhost:8025
+#     Emails (codigos OTP): http://localhost:8025, enquanto o SMTP real nao estiver configurado no .env
 # As variaveis tem padroes para desenvolvimento; um .env (veja .env.example) pode sobrescreve-las.
 
 services:
@@ -25,6 +25,7 @@ services:
     restart: unless-stopped
 
   # Servidor SMTP local: prende todos os emails e mostra numa caixa de entrada web.
+  # So e usado quando o .env nao define MAIL_HOST (sem SMTP real, ex: Gmail).
   mailpit:
     image: axllent/mailpit:v1.27
     ports:
@@ -40,8 +41,14 @@ services:
       DB_USERNAME: ${DB_USERNAME:-peca}
       DB_PASSWORD: ${DB_PASSWORD:-peca}
       JWT_SECRET: ${JWT_SECRET:-segredo-de-desenvolvimento-local-troque-se-for-expor}
-      MAIL_HOST: mailpit
-      MAIL_PORT: 1025
+      # SMTP real (ex: Gmail) se o .env definir MAIL_*; senao, o Mailpit.
+      MAIL_HOST: ${MAIL_HOST:-mailpit}
+      MAIL_PORT: ${MAIL_PORT:-1025}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-false}
+      MAIL_SMTP_STARTTLS: ${MAIL_SMTP_STARTTLS:-false}
+      MAIL_FROM: ${MAIL_FROM:-${MAIL_USERNAME:-PECA <nao-responda@peca.local>}}
       STORAGE_DIR: /dados/imagens
       CORS_ALLOWED_ORIGINS: http://localhost:3000
     ports:
