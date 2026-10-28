@@ -27,6 +27,24 @@ DB_PASSWORD=<senha-do-banco>
 
 A conexão direta (`db.<ref>.supabase.co`) só tem endereço IPv6 e não funciona no Azure App Service, que sai por IPv4. O modo transação do pooler (porta 6543) não é recomendado, porque não aceita os prepared statements que o driver JDBC usa por padrão.
 
+### Primeira subida em um Supabase com tabelas antigas
+
+O Flyway não migra um schema `public` que já tem tabelas mas não tem a tabela `flyway_schema_history`: a API para na subida. As tabelas antigas criadas pelo Hibernate (`ddl-auto=update`) também não batem com as migrations, então usar baseline faria o `validate` falhar. Antes do primeiro deploy, tire essas tabelas do `public` no **SQL Editor** do Supabase:
+
+```sql
+-- 1. Veja o que existe no public (os schemas auth e storage do Supabase não são tocados).
+SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';
+
+-- 2. Mova as tabelas antigas para um schema de backup em vez de apagar.
+--    Ajuste a lista com o resultado do passo 1.
+CREATE SCHEMA IF NOT EXISTS legado;
+ALTER TABLE public.codigos_verificacao SET SCHEMA legado;
+ALTER TABLE public.pecas SET SCHEMA legado;
+ALTER TABLE public.usuarios SET SCHEMA legado;
+```
+
+Com o `public` vazio, a próxima subida da API cria tudo pelas migrations. Os dados antigos continuam em `legado`; se não forem necessários, apague depois com `DROP SCHEMA legado CASCADE;`. As imagens do Storage não são afetadas: as URLs ficavam nas tabelas, mas os arquivos ficam no bucket.
+
 ## Rodar com Docker
 
 ```bash
