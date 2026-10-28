@@ -100,6 +100,9 @@ class SegurancaIntegrationTest {
 	void rotasPublicasNaoExigemToken() throws Exception {
 		mockMvc.perform(get("/api/pecas")).andExpect(status().isOk());
 		mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
+		// Foto inexistente: 404, e nao 401 (a rota de imagens e publica).
+		mockMvc.perform(get("/api/imagens/" + UUID.randomUUID() + "/" + UUID.randomUUID() + ".png"))
+				.andExpect(status().isNotFound());
 	}
 
 	@Test
