@@ -1,0 +1,30 @@
+# Testes e build em todo PR para a main (sem deploy). O deploy fica em main_peca-backend.yml.
+name: Verificacao
+
+on:
+  pull_request:
+    branches: [main]
+
+# Um push novo no mesmo PR cancela a verificacao anterior.
+concurrency:
+  group: verificacao-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java version
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'microsoft'
+          cache: 'maven'
+
+      - name: Testes e build
+        run: ./mvnw -B clean package
