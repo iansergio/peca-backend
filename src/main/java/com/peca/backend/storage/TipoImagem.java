@@ -33,6 +33,10 @@ enum TipoImagem {
 		return Arrays.stream(values()).filter(tipo -> tipo.corresponde(bytes)).findFirst();
 	}
 
+	static Optional<TipoImagem> porExtensao(String extensao) {
+		return Arrays.stream(values()).filter(tipo -> tipo.extensao.equals(extensao)).findFirst();
+	}
+
 	private boolean corresponde(byte[] b) {
 		return switch (this) {
 			case JPEG -> b.length >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8 && (b[2] & 0xFF) == 0xFF;

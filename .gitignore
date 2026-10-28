@@ -34,3 +34,6 @@ build/
 
 ### Variaveis de ambiente ###
 .env
+
+### Imagens gravadas localmente (STORAGE_DIR padrao) ###
+dados/

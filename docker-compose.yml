@@ -1,57 +1,72 @@
-# Desenvolvimento local. Le as variaveis do .env (veja .env.example e o README).
-#   API contra o Azure SQL:       docker compose up --build
-#   API com SQL Server local:     docker compose --profile banco-local up --build
+# Ambiente completo numa maquina so: banco, email, API e front-end.
+# O front-end e construido a partir do repositorio irmao (padrao: ../peca-front-end; mude com FRONTEND_DIR).
+#   docker compose up --build
+#     Front-end: http://localhost:3000
+#     API/Swagger: http://localhost:8080/swagger-ui.html
+#     Emails (codigos OTP): http://localhost:8025
+# As variaveis tem padroes para desenvolvimento; um .env (veja .env.example) pode sobrescreve-las.
 
 services:
+  postgres:
+    image: postgres:18.1-alpine
+    environment:
+      POSTGRES_DB: peca
+      POSTGRES_USER: ${DB_USERNAME:-peca}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-peca}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-dados:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d peca"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  # Servidor SMTP local: prende todos os emails e mostra numa caixa de entrada web.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    restart: unless-stopped
+
   api:
     build: .
     image: peca-backend:local
-    env_file: .env
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/peca
+      DB_USERNAME: ${DB_USERNAME:-peca}
+      DB_PASSWORD: ${DB_PASSWORD:-peca}
+      JWT_SECRET: ${JWT_SECRET:-segredo-de-desenvolvimento-local-troque-se-for-expor}
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      STORAGE_DIR: /dados/imagens
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
     ports:
       - "8080:8080"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:$${PORT:-8080}/actuator/health/readiness || exit 1"]
-      interval: 30s
-      timeout: 5s
-      start_period: 90s
-      retries: 3
-    depends_on:
-      # So vale com o perfil banco-local; sem ele a dependencia e ignorada.
-      sqlserver-init:
-        condition: service_completed_successfully
-        required: false
-
-  # Opcional: SQL Server local para rodar sem o Azure. A senha vem de MSSQL_SA_PASSWORD no .env.
-  sqlserver-local:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    profiles: ["banco-local"]
-    environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-}
-    ports:
-      - "1433:1433"
     volumes:
-      - sqlserver-dados:/var/opt/mssql
-    healthcheck:
-      # -C confia no certificado autoassinado do container (apenas uso local).
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -b -Q 'SELECT 1' -o /dev/null"]
-      interval: 10s
-      timeout: 5s
-      start_period: 20s
-      retries: 12
-
-  # Cria o banco "peca" na primeira vez (idempotente) e termina. As tabelas sao criadas pelo Flyway.
-  sqlserver-init:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    profiles: ["banco-local"]
+      - imagens:/dados/imagens
     depends_on:
-      sqlserver-local:
+      postgres:
         condition: service_healthy
+      mailpit:
+        condition: service_started
+    restart: unless-stopped
+
+  web:
+    build: ${FRONTEND_DIR:-../peca-front-end}
+    image: peca-front-end:local
     environment:
-      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-}
-    entrypoint: ["/bin/sh", "-c", "/opt/mssql-tools18/bin/sqlcmd -C -S sqlserver-local -U sa -P \"$$MSSQL_SA_PASSWORD\" -b -Q \"IF DB_ID('peca') IS NULL CREATE DATABASE peca\""]
-    restart: "no"
+      API_URL: http://api:8080/api
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
-  sqlserver-dados:
+  postgres-dados:
+  imagens:

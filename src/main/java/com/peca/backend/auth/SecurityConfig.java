@@ -37,7 +37,7 @@ public class SecurityConfig {
 						// Health check do container (liveness/readiness); os demais endpoints do actuator nao sao expostos.
 						.requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/auth/solicitar-codigo", "/api/auth/verificar-codigo").permitAll()
-						.requestMatchers(HttpMethod.GET, "/api/pecas", "/api/pecas/*").permitAll()
+						.requestMatchers(HttpMethod.GET, "/api/pecas", "/api/pecas/*", "/api/imagens/**").permitAll()
 						.anyRequest().authenticated())
 				.oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()))
 				.build();

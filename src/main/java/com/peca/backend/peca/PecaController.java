@@ -92,7 +92,7 @@ public class PecaController {
 	@PostMapping(path = "/{id}/imagem", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 	@Operation(summary = "Envia a imagem de um anuncio (somente o vendedor)",
-			description = "Faz upload para o Supabase Storage e salva a URL publica em imagemUrl. "
+			description = "Grava a imagem no armazenamento local e salva a URL publica em imagemUrl. "
 					+ "Substitui a imagem anterior, se houver. Formatos: JPEG, PNG ou WEBP, ate 5 MB.",
 			requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(
 					mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
@@ -103,7 +103,7 @@ public class PecaController {
 	@ApiResponse(responseCode = "403", description = "Anuncio pertence a outro vendedor")
 	@ApiResponse(responseCode = "404", description = "Anuncio nao encontrado")
 	@ApiResponse(responseCode = "413", description = "Arquivo maior que o limite")
-	@ApiResponse(responseCode = "502", description = "Falha no Supabase Storage")
+	@ApiResponse(responseCode = "500", description = "Falha ao gravar a imagem")
 	public PecaResponse enviarImagem(@Parameter(description = "Id do anuncio") @PathVariable UUID id,
 			@Parameter(description = "Arquivo de imagem") @RequestParam("arquivo") MultipartFile arquivo,
 			@AuthenticationPrincipal Jwt jwt) {

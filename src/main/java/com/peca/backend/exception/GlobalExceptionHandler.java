@@ -69,7 +69,7 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(ArmazenamentoException.class)
 	public ProblemDetail handleArmazenamento(ArmazenamentoException ex) {
-		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, ex.getMessage());
+		return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
 	}
 
 	@ExceptionHandler(EnvioEmailException.class)

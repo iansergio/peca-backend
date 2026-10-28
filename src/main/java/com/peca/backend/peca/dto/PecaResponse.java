@@ -13,8 +13,8 @@ public record PecaResponse(
 		@Schema(example = "450.00") BigDecimal preco,
 		@Schema(example = "Tela") String categoria,
 		@Schema(example = "iPhone 13") String modeloCelular,
-		@Schema(description = "URL publica da imagem no Supabase Storage (nula se nao houver)",
-				example = "https://xyz.supabase.co/storage/v1/object/public/pecas/7c9e6679-7425-40de-944b-e07fc1f90ae7/foto.jpg")
+		@Schema(description = "URL publica da imagem, servida pelo front-end (nula se nao houver)",
+				example = "/imagens/7c9e6679-7425-40de-944b-e07fc1f90ae7/0b3f5c1e-8d2a-4f6b-9c7e-1a2b3c4d5e6f.jpg")
 		String imagemUrl,
 		VendedorResponse vendedor) {
 

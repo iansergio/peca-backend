@@ -4,7 +4,7 @@ import com.peca.backend.exception.AcessoNegadoException;
 import com.peca.backend.exception.RecursoNaoEncontradoException;
 import com.peca.backend.peca.dto.PecaRequest;
 import com.peca.backend.peca.dto.PecaResponse;
-import com.peca.backend.storage.SupabaseStorageService;
+import com.peca.backend.storage.ArmazenamentoImagemService;
 import com.peca.backend.usuario.Usuario;
 import com.peca.backend.usuario.UsuarioRepository;
 import java.math.BigDecimal;
@@ -20,10 +20,10 @@ public class PecaService {
 
 	private final PecaRepository repository;
 	private final UsuarioRepository usuarioRepository;
-	private final SupabaseStorageService storageService;
+	private final ArmazenamentoImagemService storageService;
 
 	public PecaService(PecaRepository repository, UsuarioRepository usuarioRepository,
-			SupabaseStorageService storageService) {
+			ArmazenamentoImagemService storageService) {
 		this.repository = repository;
 		this.usuarioRepository = usuarioRepository;
 		this.storageService = storageService;
