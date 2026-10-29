@@ -3,15 +3,16 @@
 ## Stack Tecnológica Obrigatória
 - Linguagem: Java 25 LTS.
 - Framework: Spring Boot 4.1.
-- Banco de Dados: Azure SQL Database (migrations versionadas com Flyway).
-- Storage: Supabase Storage (para fotos).
+- Banco de Dados: PostgreSQL em container (migrations versionadas com Flyway).
+- Storage: disco local / volume do container (para fotos).
+- Ambiente: tudo roda numa máquina só via `docker compose up --build` (PostgreSQL, Mailpit, API e front-end). Não adicione dependências de serviços externos.
 - Documentação da API: Swagger/OpenAPI.
 
 ## Regras de Comportamento e Código
 1. Siga os padrões do Spring Boot: Controller, Service, Repository, Entity.
 2. Utilize DTOs (Data Transfer Objects) para entrada e saída de dados. Nunca exponha as Entidades JPA diretamente nos Controllers.
 3. Todas as rotas da API devem ser documentadas via anotações do Swagger/OpenAPI.
-4. Senhas e variáveis sensíveis (como credenciais do Supabase) devem vir de variáveis de ambiente (`application.properties` via `System.getenv`).
+4. Senhas e variáveis sensíveis (como credenciais do banco e o segredo do JWT) devem vir de variáveis de ambiente (`application.properties` via `System.getenv`).
 5. Proteja os endpoints de escrita (criação de anúncios, edição de perfis) com autenticação JWT.
 6. O sistema de usuários **não utiliza senhas**. O email é o único identificador do usuário e a autenticação é feita exclusivamente via Passwordless OTP (código de 6 dígitos enviado por email), que, ao ser validado, emite o token JWT. Não crie campos, endpoints ou fluxos baseados em senha.
 

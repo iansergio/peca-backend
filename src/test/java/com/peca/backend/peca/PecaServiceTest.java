@@ -11,7 +11,7 @@ import com.peca.backend.exception.AcessoNegadoException;
 import com.peca.backend.exception.RecursoNaoEncontradoException;
 import com.peca.backend.peca.dto.PecaRequest;
 import com.peca.backend.peca.dto.PecaResponse;
-import com.peca.backend.storage.SupabaseStorageService;
+import com.peca.backend.storage.ArmazenamentoImagemService;
 import com.peca.backend.usuario.Usuario;
 import com.peca.backend.usuario.UsuarioRepository;
 import java.math.BigDecimal;
@@ -34,7 +34,7 @@ class PecaServiceTest {
 	private UsuarioRepository usuarioRepository;
 
 	@Mock
-	private SupabaseStorageService storageService;
+	private ArmazenamentoImagemService storageService;
 
 	private PecaService service;
 
@@ -119,16 +119,16 @@ class PecaServiceTest {
 		UUID id = UUID.randomUUID();
 		UUID vendedorId = UUID.randomUUID();
 		Peca peca = pecaExistente(id, vendedor(vendedorId));
-		peca.setImagemUrl("https://x.supabase.co/storage/v1/object/public/pecas/antiga.png");
+		peca.setImagemUrl("http://localhost:8080/api/imagens/peca/antiga.png");
 		MockMultipartFile arquivo = new MockMultipartFile("arquivo", "foto.png", "image/png", new byte[] {1});
 		when(repository.findById(id)).thenReturn(Optional.of(peca));
-		when(storageService.enviarImagem(id.toString(), arquivo)).thenReturn("https://x.supabase.co/nova.png");
+		when(storageService.enviarImagem(id.toString(), arquivo)).thenReturn("http://localhost:8080/api/imagens/peca/nova.png");
 		when(repository.save(any(Peca.class))).thenAnswer(inv -> inv.getArgument(0));
 
 		PecaResponse response = service.enviarImagem(id, arquivo, vendedorId);
 
-		assertThat(response.imagemUrl()).isEqualTo("https://x.supabase.co/nova.png");
-		verify(storageService).removerPorUrl("https://x.supabase.co/storage/v1/object/public/pecas/antiga.png");
+		assertThat(response.imagemUrl()).isEqualTo("http://localhost:8080/api/imagens/peca/nova.png");
+		verify(storageService).removerPorUrl("http://localhost:8080/api/imagens/peca/antiga.png");
 	}
 
 	@Test

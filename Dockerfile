@@ -9,7 +9,7 @@ COPY mvnw pom.xml ./
 COPY .mvn .mvn
 RUN ./mvnw -B dependency:go-offline
 
-# Os testes rodam no CI/PR, nao no build da imagem.
+# Os testes rodam com ./mvnw clean package fora da imagem, nao no build dela.
 COPY src src
 RUN ./mvnw -B clean package -DskipTests \
     && java -Djarmode=tools -jar target/peca-backend-*.jar extract --layers \
@@ -32,16 +32,18 @@ COPY --from=build /build/target/extracted/spring-boot-loader/ ./
 COPY --from=build /build/target/extracted/snapshot-dependencies/ ./
 COPY --from=build /build/target/extracted/application/ ./
 
+# Pasta das imagens (STORAGE_DIR no docker-compose.yml), gravavel pelo usuario da aplicacao.
+RUN mkdir -p /dados/imagens && chown -R app:app /dados
+
 USER app
 
-# Sem segredos aqui: toda a configuracao (DB_*, JWT_*, MAIL_*, SUPABASE_*, CORS_ALLOWED_ORIGINS) entra
+# Sem segredos aqui: toda a configuracao (DB_*, JWT_*, MAIL_*, STORAGE_*, CORS_ALLOWED_ORIGINS) entra
 # por variavel de ambiente em runtime. Definir JAVA_OPTS substitui as opcoes padrao abaixo.
 ENV TZ=UTC \
     JAVA_OPTS="-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError"
 EXPOSE 8080
 
-# start-period longo: o Azure SQL serverless pode levar ate 1 minuto para acordar.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=3 \
     CMD wget -q -O /dev/null "http://localhost:${PORT:-8080}/actuator/health/readiness" || exit 1
 
 # sh -c para expandir JAVA_OPTS; o exec faz o java virar o PID 1 e receber o SIGTERM do docker stop.

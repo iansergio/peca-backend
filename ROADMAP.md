@@ -9,7 +9,7 @@
 - [x] Inicializar projeto Spring Boot 4.1 com Java 25 LTS.
 - [x] Configurar conexão com o banco de dados Supabase (PostgreSQL).
 - [x] Configurar o Swagger/OpenAPI para documentação (acessível via `/swagger-ui.html`).
-- [-] Migrar o banco para Azure SQL Database com migrations Flyway.
+- [-] Banco PostgreSQL local em container (Docker Compose), com o schema numa migration Flyway única (`V1__schema_inicial.sql`). Substitui o Azure SQL Database.
 
 ## Fase 2: Domínio de Usuários
 - [x] Criar Entidade e DTOs de Usuário (Nome, Email, WhatsApp). Email é o identificador único e obrigatório.
@@ -25,14 +25,14 @@
 - [-] Exigir número de contato (`whatsapp`, 10 a 13 dígitos) ao criar/editar anúncio; o número é salvo no perfil do vendedor e exibido em `vendedor.whatsapp`.
 
 ## Fase 4: Imagens
-- [x] Integrar API do Supabase Storage para upload de imagens das peças.
 - [x] Salvar a URL pública da imagem na Entidade da Peça.
+- [-] Armazenamento local das imagens (volume no container), servidas em `GET /api/imagens/{pasta}/{arquivo}`. Substitui o Supabase Storage.
 
 ## Fase 5: Autenticação (Passwordless OTP + JWT)
 - [x] Criar a entidade `CodigoVerificacao` (código OTP de 6 dígitos vinculado ao email, com expiração).
 - [x] Criar endpoint para solicitar código OTP por email (`POST /api/auth/solicitar-codigo`, cria o usuário se ele ainda não existir).
 - [-] Nome do usuário ao solicitar o código OTP: obrigatório só no cadastro (email sem conta). No login de um usuário existente basta o email; email sem conta e sem nome responde 200 sem gerar nem enviar código, para não revelar quais emails estão cadastrados. O nome não sobrescreve o de um usuário existente. O `peca-front-end` já removeu o contorno que tratava o antigo 400 como envio neutro.
-- [x] Enviar o código OTP por email real via SMTP (`spring-boot-starter-mail` + `EmailService`), substituindo a simulação no console. Credenciais via `MAIL_*` no `.env`.
+- [x] Enviar o código OTP por email real via SMTP (`spring-boot-starter-mail` + `EmailService`), substituindo a simulação no console. Credenciais via `MAIL_*` no `.env` (Gmail com senha de app); sem elas, os emails vão para o Mailpit do Docker Compose (http://localhost:8025).
 - [x] Criar endpoint para validar o código OTP e emitir o token JWT (`POST /api/auth/verificar-codigo`).
 - [x] Remover o endpoint de login com senha (`POST /api/auth/login`).
 - [x] Proteger endpoints de escrita com JWT (apenas os endpoints de OTP e a leitura de peças são públicos).
@@ -43,6 +43,5 @@
 - [-] CORS configurável por ambiente (`CORS_ALLOWED_ORIGINS`), com preflight sem token e `Retry-After`/`Location` expostos. Opcional: o front Next.js chama a API pelo servidor e não depende de CORS.
 - [-] Health check via Actuator (`/actuator/health` com probes de liveness/readiness; readiness inclui o banco).
 - [-] Dockerfile multi-stage (JDK 25 no build, JRE 25 no runtime, usuário não root, jar em camadas, `HEALTHCHECK`).
-- [-] `docker-compose.yml` para desenvolvimento local, com SQL Server local opcional (perfil `banco-local`).
-- [ ] Validar a imagem rodando contra o Azure SQL e publicar em registry (ACR/GHCR).
-- [-] Deploy contínuo: a cada push na `main` o GitHub Actions roda os testes, publica a imagem no GHCR e atualiza o Azure Container Apps (`peca-api`, escala a zero).
+- [-] `docker-compose.yml` que sobe tudo numa máquina, sem serviços externos: PostgreSQL, Mailpit, API e o front-end (construído de `../peca-front-end`).
+- Removidos o deploy no Azure (workflows do GitHub Actions) e as integrações com Azure SQL e Supabase.
