@@ -1,0 +1,401 @@
+#!/usr/bin/env bash
+# sdd — keep a project in sync with the Spec-Driven Development template
+# https://github.com/emersonmendes/sdd
+#
+# Commands
+#   sdd init   --template <dir> [--target <dir>] [--force]
+#       First render of the template into a project. Needs <target>/.sdd/config (written by
+#       the setup protocol). Managed files are rendered; scaffold files are copied only if missing.
+#   sdd update [--template <dir>] [--ref <git-ref>] [--target <dir>]
+#       Bring template changes into the project with a 3-way merge per managed file:
+#       base = pristine render at the previous template ref, ours = the project's file,
+#       theirs = pristine render at the new ref. Conflicts are left as markers to resolve.
+#   sdd status [--template <dir>] [--target <dir>]
+#       Show template version, latest remote ref, enabled skills and locally customized files.
+#   sdd diff   [--template <dir>] [--target <dir>] [<managed-file>]
+#       Show the project's customizations against the pristine render (to port them upstream).
+#
+# Managed files (rendered, 3-way merged on update):
+#   .claude/skills/<prefix>.<skill>/**   .claude/agents/techlead.md   .sdd/sdd (replaced)
+# Scaffold files (copied at init only, project-owned afterwards):
+#   CLAUDE.md  ai/**  specs/_template/**  docs/Product.md  (.claude/agents/<app>-dev.md via setup)
+#
+# Needs bash 4+, git, tar and coreutils. No other dependency.
+
+set -euo pipefail
+shopt -u patsub_replacement 2>/dev/null || true
+
+SDD_SCRIPT_VERSION="0.3.0"
+DEFAULT_REPO="https://github.com/emersonmendes/sdd.git"
+
+log()  { printf '%s\n' "$*"; }
+warn() { printf 'warning: %s\n' "$*" >&2; }
+die()  { printf 'error: %s\n' "$*" >&2; exit 1; }
+
+TMP="$(mktemp -d)"
+cleanup() { rm -rf "$TMP"; }
+trap 'rc=$?; cleanup; exit $rc' EXIT
+tmpdir() { printf '%s' "$TMP"; }
+
+# ---------------------------------------------------------------------------------------------
+# Config (.sdd/config): KEY=value lines, '#' comments. Parsed, never sourced.
+# ---------------------------------------------------------------------------------------------
+load_config() {
+  local file="$1" line key value
+  [ -f "$file" ] || die "config not found: $file (run the setup first — see README)"
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in ''|'#'*) continue ;; esac
+    key="${line%%=*}"; value="${line#*=}"
+    key="${key//[[:space:]]/}"
+    [[ "$key" =~ ^SDD_[A-Z_]+$ ]] || die "invalid line in $file: $line"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    if [[ "$value" == \"*\" && "$value" == *\" ]]; then value="${value#\"}"; value="${value%\"}"; fi
+    printf -v "$key" '%s' "$value"
+  done < "$file"
+  : "${SDD_PREFIX:?SDD_PREFIX missing in $file}"
+  : "${SDD_SKILLS:?SDD_SKILLS missing in $file}"
+  [[ "$SDD_PREFIX" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die "SDD_PREFIX must be lowercase kebab-case: $SDD_PREFIX"
+  SDD_PROJECT_NAME="${SDD_PROJECT_NAME:-$SDD_PREFIX}"
+  SDD_LANGUAGE="${SDD_LANGUAGE:-English}"
+  SDD_MODEL_IMPLEMENT="${SDD_MODEL_IMPLEMENT:-sonnet}"
+  SDD_MODEL_LEAD="${SDD_MODEL_LEAD:-opus}"
+  SDD_TEMPLATE_REPO="${SDD_TEMPLATE_REPO:-$DEFAULT_REPO}"
+  SDD_TEMPLATE_REF="${SDD_TEMPLATE_REF:-}"
+  SDD_TEMPLATE_VERSION="${SDD_TEMPLATE_VERSION:-}"
+}
+
+set_config_value() { # file key value
+  local file="$1" key="$2" value="$3" tmp
+  tmp="$(mktemp "${file}.XXXXXX")"
+  if grep -q "^${key}=" "$file"; then
+    awk -v k="$key" -v v="$value" 'index($0, k"=") == 1 { print k "=" v; next } { print }' "$file" > "$tmp"
+  else
+    cat "$file" > "$tmp"; printf '%s=%s\n' "$key" "$value" >> "$tmp"
+  fi
+  mv -f "$tmp" "$file"
+}
+
+# ---------------------------------------------------------------------------------------------
+# Rendering: {{PREFIX}} {{PROJECT_NAME}} {{LANGUAGE}} {{MODEL_IMPLEMENT}} {{MODEL_LEAD}} in *.md
+# ---------------------------------------------------------------------------------------------
+render_file() { # src dst
+  local src="$1" dst="$2" line
+  mkdir -p "$(dirname "$dst")"
+  case "$src" in
+    *.md)
+      { while IFS= read -r line || [ -n "$line" ]; do
+          line="${line//'{{PREFIX}}'/$SDD_PREFIX}"
+          line="${line//'{{PROJECT_NAME}}'/$SDD_PROJECT_NAME}"
+          line="${line//'{{LANGUAGE}}'/$SDD_LANGUAGE}"
+          line="${line//'{{MODEL_IMPLEMENT}}'/$SDD_MODEL_IMPLEMENT}"
+          line="${line//'{{MODEL_LEAD}}'/$SDD_MODEL_LEAD}"
+          printf '%s\n' "$line"
+        done < "$src"; } > "$dst"
+      ;;
+    *) cp -f "$src" "$dst" ;;
+  esac
+}
+
+# Managed entries of a template checkout: "src_rel<TAB>dst_rel"
+list_managed() { # template_dir
+  local tpl="$1" s f rel
+  for s in $SDD_SKILLS; do
+    if [ ! -d "$tpl/template/skills/$s" ]; then warn "skill '$s' is not in this template version; skipped"; continue; fi
+    while IFS= read -r f; do
+      rel="${f#"$tpl/template/skills/$s/"}"
+      printf '%s\t%s\n' "template/skills/$s/$rel" ".claude/skills/${SDD_PREFIX}.$s/$rel"
+    done < <(find "$tpl/template/skills/$s" -type f | LC_ALL=C sort)
+  done
+  if [ -f "$tpl/template/agents/techlead.md" ]; then
+    printf '%s\t%s\n' "template/agents/techlead.md" ".claude/agents/techlead.md"
+  fi
+  printf '%s\t%s\n' "bin/sdd" ".sdd/sdd"
+}
+
+list_scaffold() { # template_dir -> "src_rel<TAB>dst_rel"
+  local tpl="$1" f rel
+  [ -d "$tpl/template/project" ] || return 0
+  while IFS= read -r f; do
+    rel="${f#"$tpl/template/project/"}"
+    printf '%s\t%s\n' "template/project/$rel" "$rel"
+  done < <(find "$tpl/template/project" -type f | LC_ALL=C sort)
+}
+
+render_managed() { # template_dir out_dir
+  local tpl="$1" out="$2" src dst
+  while IFS=$'\t' read -r src dst; do
+    render_file "$tpl/$src" "$out/$dst"
+  done < <(list_managed "$tpl")
+}
+
+install_file() { # src dst  (atomic replace; safe for the running script)
+  local src="$1" dst="$2" tmp
+  mkdir -p "$(dirname "$dst")"
+  tmp="$(mktemp "$(dirname "$dst")/.sdd.XXXXXX")"
+  cp -f "$src" "$tmp"; mv -f "$tmp" "$dst"
+  case "$dst" in */.sdd/sdd|.sdd/sdd) chmod +x "$dst" ;; esac
+}
+
+# ---------------------------------------------------------------------------------------------
+# Template checkout helpers
+# ---------------------------------------------------------------------------------------------
+is_git_repo() { git -C "$1" rev-parse --is-inside-work-tree >/dev/null 2>&1; }
+
+template_ref() { # dir -> full sha or "unknown"
+  if is_git_repo "$1"; then git -C "$1" rev-parse HEAD; else printf 'unknown'; fi
+}
+template_version() { # dir ref
+  if is_git_repo "$1"; then git -C "$1" describe --tags --always "$2" 2>/dev/null || printf 'unknown'; else printf 'unknown'; fi
+}
+
+# Resolve the template repository: --template <dir> or a fresh clone of SDD_TEMPLATE_REPO.
+resolve_template() { # template_arg -> prints dir
+  local arg="$1" dir
+  if [ -n "$arg" ]; then
+    [ -d "$arg" ] || die "template dir not found: $arg"
+    [ -d "$arg/template/skills" ] || die "not a template checkout (missing template/skills): $arg"
+    printf '%s' "$arg"
+  else
+    dir="$(tmpdir)/template"
+    log "cloning $SDD_TEMPLATE_REPO ..." >&2
+    git clone --quiet "$SDD_TEMPLATE_REPO" "$dir" || die "could not clone $SDD_TEMPLATE_REPO"
+    printf '%s' "$dir"
+  fi
+}
+
+export_ref() { # repo ref out_dir
+  local repo="$1" ref="$2" out="$3"
+  is_git_repo "$repo" || die "update needs a git checkout of the template (got a plain directory: $repo)"
+  mkdir -p "$out"
+  git -C "$repo" archive --format=tar "$ref" | tar -x -C "$out" || die "could not export ref $ref from $repo"
+}
+
+# ---------------------------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------------------------
+cmd_init() {
+  local tpl="" target="." force=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --template) tpl="$2"; shift 2 ;;
+      --target)   target="$2"; shift 2 ;;
+      --force)    force=1; shift ;;
+      *) die "init: unknown option $1" ;;
+    esac
+  done
+  [ -n "$tpl" ] || die "init: --template <dir> is required (a clone of the template repository)"
+  load_config "$target/.sdd/config"
+  tpl="$(resolve_template "$tpl")"
+
+  local ref version out src dst created=0 skipped=0 scaffolded=0
+  ref="$(template_ref "$tpl")"; version="$(template_version "$tpl" "$ref")"
+  out="$(tmpdir)/render"; render_managed "$tpl" "$out"
+
+  while IFS=$'\t' read -r src dst; do
+    if [ -e "$target/$dst" ] && [ "$force" -eq 0 ]; then
+      warn "exists, kept (use --force to overwrite): $dst"; skipped=$((skipped + 1)); continue
+    fi
+    install_file "$out/$dst" "$target/$dst"; created=$((created + 1))
+  done < <(list_managed "$tpl")
+
+  while IFS=$'\t' read -r src dst; do
+    [ -e "$target/$dst" ] && continue
+    render_file "$tpl/$src" "$target/$dst"; scaffolded=$((scaffolded + 1))
+  done < <(list_scaffold "$tpl")
+
+  set_config_value "$target/.sdd/config" SDD_TEMPLATE_REPO "$SDD_TEMPLATE_REPO"
+  set_config_value "$target/.sdd/config" SDD_TEMPLATE_REF "$ref"
+  set_config_value "$target/.sdd/config" SDD_TEMPLATE_VERSION "$version"
+
+  log "sdd init: template $version ($ref)"
+  log "  managed files written: $created, kept existing: $skipped, scaffold files created: $scaffolded"
+  log "  next: adapt the project blocks and scaffold per setup/SETUP.md, then 'bash .sdd/sdd status'"
+}
+
+cmd_update() {
+  local tpl="" target="." new_ref_arg=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --template) tpl="$2"; shift 2 ;;
+      --target)   target="$2"; shift 2 ;;
+      --ref)      new_ref_arg="$2"; shift 2 ;;
+      *) die "update: unknown option $1" ;;
+    esac
+  done
+  load_config "$target/.sdd/config"
+  [ -n "$SDD_TEMPLATE_REF" ] || die "SDD_TEMPLATE_REF missing in .sdd/config — run 'sdd init' first"
+  tpl="$(resolve_template "$tpl")"
+  is_git_repo "$tpl" || die "update needs a git checkout of the template: $tpl"
+
+  local old_ref new_ref old_dir new_dir base next
+  old_ref="$SDD_TEMPLATE_REF"
+  new_ref="$(git -C "$tpl" rev-parse --verify "${new_ref_arg:-HEAD}^{commit}" 2>/dev/null)" \
+    || die "ref not found in template: ${new_ref_arg:-HEAD}"
+  git -C "$tpl" cat-file -e "${old_ref}^{commit}" 2>/dev/null \
+    || die "previous ref $old_ref is not in the template clone (history rewritten?)"
+
+  if [ "$new_ref" = "$old_ref" ]; then
+    log "sdd update: already at $(template_version "$tpl" "$new_ref") ($new_ref)"; return 0
+  fi
+
+  old_dir="$(tmpdir)/old"; new_dir="$(tmpdir)/new"; base="$(tmpdir)/base"; next="$(tmpdir)/next"
+  export_ref "$tpl" "$old_ref" "$old_dir"
+  export_ref "$tpl" "$new_ref" "$new_dir"
+  render_managed "$old_dir" "$base" 2>/dev/null
+  render_managed "$new_dir" "$next"
+
+  local src dst proj b n merged rc conflicts=0 updated=0 kept=0 created=0 unchanged=0 new_tpl=""
+  local report=""
+  add() { report="${report}  $1"$'\n'; }
+  same() { unchanged=$((unchanged + 1)); }
+
+  while IFS=$'\t' read -r src dst; do
+    proj="$target/$dst"; b="$base/$dst"; n="$next/$dst"
+    if [ "$dst" = ".sdd/sdd" ]; then new_tpl="$n"; continue; fi
+    if [ ! -f "$proj" ]; then
+      if [ -f "$b" ]; then add "skipped (deleted locally): $dst"; kept=$((kept + 1))
+      else install_file "$n" "$proj"; add "created (new in template): $dst"; created=$((created + 1)); fi
+      continue
+    fi
+    if [ ! -f "$b" ]; then
+      if cmp -s "$proj" "$n"; then same
+      else install_file "$n" "${proj}.sdd-template"; add "exists locally, template copy saved as ${dst}.sdd-template"; kept=$((kept + 1)); fi
+      continue
+    fi
+    if cmp -s "$proj" "$b"; then
+      if cmp -s "$b" "$n"; then same
+      else install_file "$n" "$proj"; add "updated: $dst"; updated=$((updated + 1)); fi
+      continue
+    fi
+    if cmp -s "$b" "$n"; then add "kept (customized, template unchanged): $dst"; kept=$((kept + 1)); continue; fi
+    merged="$(tmpdir)/merged.$$"
+    set +e
+    git merge-file -p -L project -L template-base -L template-new "$proj" "$b" "$n" > "$merged"
+    rc=$?
+    set -e
+    if [ "$rc" -eq 255 ] || [ "$rc" -lt 0 ]; then die "git merge-file failed on $dst"; fi
+    install_file "$merged" "$proj"
+    if [ "$rc" -eq 0 ]; then add "merged (customized + template changes): $dst"; updated=$((updated + 1))
+    else add "CONFLICT ($rc hunk(s), resolve the markers): $dst"; conflicts=$((conflicts + 1)); fi
+  done < <(list_managed "$new_dir")
+
+  # files that disappeared from the template
+  while IFS=$'\t' read -r src dst; do
+    [ -f "$next/$dst" ] || [ "$dst" = ".sdd/sdd" ] || add "removed from template (delete manually if unused): $dst"
+  done < <(list_managed "$old_dir" 2>/dev/null)
+
+  # scaffold / setup changes are project-owned: report, never merge
+  local scaffold_diff="$target/.sdd/last-scaffold.diff"
+  if git -C "$tpl" diff --quiet "$old_ref" "$new_ref" -- template/project template/agents/_dev.template.md setup 2>/dev/null; then
+    rm -f "$scaffold_diff"
+  else
+    git -C "$tpl" diff "$old_ref" "$new_ref" -- template/project template/agents/_dev.template.md setup > "$scaffold_diff"
+    add "scaffold/setup changed in the template — review ${scaffold_diff#"$target/"} and apply by hand"
+  fi
+
+  set_config_value "$target/.sdd/config" SDD_TEMPLATE_REF "$new_ref"
+  set_config_value "$target/.sdd/config" SDD_TEMPLATE_VERSION "$(template_version "$tpl" "$new_ref")"
+  [ -n "$new_tpl" ] && install_file "$new_tpl" "$target/.sdd/sdd"
+
+  log "sdd update: $(template_version "$tpl" "$old_ref") -> $(template_version "$tpl" "$new_ref")"
+  printf '%s' "$report"
+  log "  updated/merged: $updated, created: $created, kept: $kept, unchanged: $unchanged, conflicts: $conflicts"
+  if [ "$conflicts" -gt 0 ]; then
+    log "  resolve the <<<<<<< markers (keep the project's customizations, apply the template's change on top), then commit"
+    exit 2
+  fi
+}
+
+cmd_status() {
+  local tpl="" target="."
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --template) tpl="$2"; shift 2 ;;
+      --target)   target="$2"; shift 2 ;;
+      *) die "status: unknown option $1" ;;
+    esac
+  done
+  load_config "$target/.sdd/config"
+  log "template : $SDD_TEMPLATE_REPO"
+  log "version  : ${SDD_TEMPLATE_VERSION:-unknown} (${SDD_TEMPLATE_REF:-no ref})"
+  local latest
+  latest="$(git ls-remote "$SDD_TEMPLATE_REPO" HEAD 2>/dev/null | cut -f1 || true)"
+  if [ -n "$latest" ]; then
+    if [ "$latest" = "$SDD_TEMPLATE_REF" ]; then log "latest   : up to date"; else log "latest   : $latest (run 'sdd update')"; fi
+  else
+    log "latest   : (remote not reachable or empty)"
+  fi
+  log "prefix   : $SDD_PREFIX   language: $SDD_LANGUAGE   models: implement=$SDD_MODEL_IMPLEMENT lead=$SDD_MODEL_LEAD"
+  log "skills   : $SDD_SKILLS"
+
+  local leftovers
+  leftovers="$(grep -rln -e '{{[A-Z_]*}}' -e '^<<<<<<< ' "$target/.claude" "$target/CLAUDE.md" "$target/ai" 2>/dev/null || true)"
+  if [ -n "$leftovers" ]; then
+    log "leftover placeholders or conflict markers:"; printf '%s\n' "$leftovers" | sed "s#^$target/#  #"
+  fi
+
+  if [ -n "$tpl" ] || [ -n "$SDD_TEMPLATE_REF" ]; then
+    tpl="$(resolve_template "$tpl")" || return 0
+    local base src dst customized=""
+    base="$(tmpdir)/base"
+    if is_git_repo "$tpl" && git -C "$tpl" cat-file -e "${SDD_TEMPLATE_REF}^{commit}" 2>/dev/null; then
+      export_ref "$tpl" "$SDD_TEMPLATE_REF" "$(tmpdir)/old"; render_managed "$(tmpdir)/old" "$base" 2>/dev/null
+    else
+      render_managed "$tpl" "$base" 2>/dev/null
+    fi
+    while IFS=$'\t' read -r src dst; do
+      [ "$dst" = ".sdd/sdd" ] && continue
+      if [ ! -f "$target/$dst" ]; then customized="${customized}  missing: $dst"$'\n'
+      elif ! cmp -s "$target/$dst" "$base/$dst"; then customized="${customized}  customized: $dst"$'\n'; fi
+    done < <(list_managed "$tpl")
+    if [ -n "$customized" ]; then log "managed files that differ from the pristine render:"; printf '%s' "$customized"
+    else log "managed files: all pristine"; fi
+  fi
+}
+
+cmd_diff() {
+  local tpl="" target="." only=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --template) tpl="$2"; shift 2 ;;
+      --target)   target="$2"; shift 2 ;;
+      -*) die "diff: unknown option $1" ;;
+      *) only="$1"; shift ;;
+    esac
+  done
+  load_config "$target/.sdd/config"
+  tpl="$(resolve_template "$tpl")"
+  local base src dst
+  base="$(tmpdir)/base"
+  if is_git_repo "$tpl" && [ -n "$SDD_TEMPLATE_REF" ] && git -C "$tpl" cat-file -e "${SDD_TEMPLATE_REF}^{commit}" 2>/dev/null; then
+    export_ref "$tpl" "$SDD_TEMPLATE_REF" "$(tmpdir)/old"; render_managed "$(tmpdir)/old" "$base" 2>/dev/null
+  else
+    render_managed "$tpl" "$base" 2>/dev/null
+  fi
+  while IFS=$'\t' read -r src dst; do
+    [ "$dst" = ".sdd/sdd" ] && continue
+    [ -n "$only" ] && [ "$dst" != "$only" ] && [ "$dst" != "${only#./}" ] && continue
+    [ -f "$target/$dst" ] || continue
+    diff -u --label "template/$dst" --label "project/$dst" "$base/$dst" "$target/$dst" || true
+  done < <(list_managed "$tpl")
+}
+
+usage() {
+  sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+main() {
+  local cmd="${1:-help}"; shift || true
+  case "$cmd" in
+    init)    cmd_init "$@" ;;
+    update)  cmd_update "$@" ;;
+    status)  cmd_status "$@" ;;
+    diff)    cmd_diff "$@" ;;
+    version) log "sdd $SDD_SCRIPT_VERSION" ;;
+    help|-h|--help) usage ;;
+    *) die "unknown command: $cmd (try 'sdd help')" ;;
+  esac
+}
+
+main "$@"
