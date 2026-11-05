@@ -22,6 +22,7 @@ tem spec ainda. Os números `P-n` apontam para os "Open points" de
 | Excluir anúncio | `listing-delete` | Anúncios | `DELETE /api/pecas/{id}`; `/pecas/[id]/editar` | parcial | none | Só o vendedor; P-9 |
 | Vitrine e listagem | `listing-browse` | Vitrine | `GET /api/pecas`; `/`, `/pecas` | parcial | none | Filtros por modelo e preço na API; P-10 |
 | Busca e filtro por categoria | `listing-search` | Vitrine | `lib/filtro-pecas.ts`, `components/vitrine/categorias.ts`; `/pecas?q=&categoria=` | no | none | Filtra no front; P-10, P-11 |
+| Atalhos de categorias | `category-shortcuts` | Vitrine | `categoriasRapidas`, `components/layout/categorias-rapidas.tsx` | no | `specs/category-shortcuts` | Filtra no front; P-10, P-11 |
 | Detalhe da peça | `listing-detail` | Vitrine | `GET /api/pecas/{id}`; `/pecas/[id]` | parcial | none | |
 | Contato pelo WhatsApp | `seller-contact` | Vitrine | `VendedorResponse`, `lib/whatsapp.ts`, `components/peca/contato-anunciante.tsx` | parcial | none | `vendedor.whatsapp` pode vir nulo |
 | Meus anúncios | `my-listings` | Anúncios | `components/perfil/meus-anuncios.tsx`; `/perfil?aba=anuncios` | no | none | Filtra pelo `vendedor.id` no front; P-10 |
