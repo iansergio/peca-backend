@@ -8,10 +8,10 @@ Funcionalidades encontradas por engenharia reversa em 2026-11-05. Esta lista é 
 
 | Funcionalidade | Slug | Área | Pontos de entrada | Testes | Spec | Notas |
 |---|---|---|---|---|---|---|
-| Login por OTP | `otp-login` | Autenticação | `POST /api/auth/solicitar-codigo`, `POST /api/auth/verificar-codigo`; `/login` | parcial | none | P-1, P-5 |
+| Login por OTP | `otp-login` | Autenticação | `POST /api/auth/solicitar-codigo`, `POST /api/auth/verificar-codigo`; `/login` | parcial | `otp-login` (2026-11-05) | D-1 a D-3; ver `specs/otp-login/rules.md` |
 | Cadastro por OTP | `otp-signup` | Autenticação | Mesmos endpoints, com `nome`; `/registo` | parcial | none | Usuário criado só ao validar o código; P-5 |
-| Limites de pedidos de OTP | `otp-rate-limit` | Autenticação | `AuthService`, `LimitadorSolicitacoesPorIp`, `lib/visitante.ts` | parcial | none | P-1, P-2, P-15 |
-| Envio do email de OTP | `otp-email` | Autenticação | `EmailService` | yes | none | SMTP real ou Mailpit; P-3 |
+| Limites de pedidos de OTP | `otp-rate-limit` | Autenticação | `AuthService`, `LimitadorSolicitacoesPorIp`, `lib/visitante.ts` | parcial | `otp-login` (2026-11-05) | D-1, D-2, D-4, D-9 |
+| Envio do email de OTP | `otp-email` | Autenticação | `EmailService` | yes | `otp-login` (2026-11-05) | SMTP real ou Mailpit; D-7 |
 | Sessão no front | `web-session` | Autenticação | `lib/sessao.ts`, `lib/jwt.ts`, `proxy.ts`, menu da conta, `sair` | no | none | Header pode mostrar a sessão até 5 min após expirar |
 | Proteção das rotas da API | `api-access-control` | Autenticação | `SecurityConfig`, `UsuarioAutenticado` | yes | none | P-8 |
 | Perfil do usuário | `user-profile` | Usuários | `GET /api/usuarios/me`, `GET` e `PUT /api/usuarios/{id}`; `/perfil` | parcial | none | Email não editável |
