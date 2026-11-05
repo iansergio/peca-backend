@@ -23,9 +23,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
 	private final AuthService service;
+	private final TempoMinimoResposta tempoMinimo;
 
-	public AuthController(AuthService service) {
+	public AuthController(AuthService service, TempoMinimoResposta tempoMinimo) {
 		this.service = service;
+		this.tempoMinimo = tempoMinimo;
 	}
 
 	@PostMapping("/solicitar-codigo")
@@ -34,18 +36,19 @@ public class AuthController {
 					+ "o perfil). Cadastro: nome e email; o usuario so e criado quando o codigo for validado, com o nome "
 					+ "informado. Email sem conta e sem nome responde 200 igual, mas nenhum codigo e enviado, para nao "
 					+ "revelar quais emails estao cadastrados. "
-					+ "O codigo vale por 10 minutos e e enviado por email. Limites: 1 pedido a cada 60 segundos e "
-					+ "5 por hora para o mesmo email, e 20 por hora por IP.")
-	@ApiResponse(responseCode = "200", description = "Codigo gerado e enviado")
+					+ "O codigo vale por 10 minutos e o email sai depois da resposta; se o envio falhar, peca outro "
+					+ "codigo. Limites: 1 pedido a cada 60 segundos e 5 por hora para o mesmo email, com ou sem conta, "
+					+ "e 20 por hora por IP.")
+	@ApiResponse(responseCode = "200", description = "Pedido aceito; a resposta nao indica se o email tem conta")
 	@ApiResponse(responseCode = "400", description = "Email invalido ou nome com mais de 120 caracteres")
 	@ApiResponse(responseCode = "429", description = "Limite de solicitacoes excedido; aguarde o tempo do header Retry-After",
 			headers = @Header(name = HttpHeaders.RETRY_AFTER, description = "Segundos ate poder solicitar de novo",
 					schema = @Schema(type = "integer")))
-	@ApiResponse(responseCode = "502", description = "Falha ao enviar o email com o codigo")
 	public SolicitarCodigoResponse solicitarCodigo(@Valid @RequestBody SolicitarCodigoRequest request,
 			HttpServletRequest httpRequest) {
 		// Atras de proxy, o IP real vem do X-Forwarded-For (server.forward-headers-strategy=framework).
-		return service.solicitarCodigo(request, httpRequest.getRemoteAddr());
+		// Aqui, e nao no service: o tempo minimo precisa cobrir tambem o commit da transacao.
+		return tempoMinimo.executar(() -> service.solicitarCodigo(request, httpRequest.getRemoteAddr()));
 	}
 
 	@PostMapping("/verificar-codigo")

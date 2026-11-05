@@ -6,6 +6,13 @@ import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.startsWith;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.hasKey;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.after;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -16,10 +23,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import com.peca.backend.auth.dto.SolicitarCodigoRequest;
 import com.peca.backend.email.EmailService;
+import com.peca.backend.email.EnvioEmailException;
 import com.peca.backend.usuario.UsuarioRepository;
+import java.time.Duration;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -29,6 +42,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Fluxo completo: cadastro integrado por OTP, rotas protegidas e checagem de autoria.
@@ -48,6 +62,12 @@ class SegurancaIntegrationTest {
 
 	@Autowired
 	private UsuarioRepository usuarioRepository;
+
+	@Autowired
+	private AuthService authService;
+
+	@Autowired
+	private TransactionTemplate transactionTemplate;
 
 	// Evita conexao SMTP real; o codigo e lido direto do banco.
 	@MockitoBean
@@ -92,6 +112,14 @@ class SegurancaIntegrationTest {
 		return new Sessao("Bearer " + JsonPath.read(resposta, "$.token"), JsonPath.read(resposta, "$.usuario.id"));
 	}
 
+	// Recua os pedidos do email para passar do intervalo minimo entre pedidos.
+	private void recuarPedidos(String email) {
+		codigoRepository.findAll().stream().filter(codigo -> codigo.getEmail().equals(email)).forEach(codigo -> {
+			codigo.setCriadoEm(codigo.getCriadoEm().minusMinutes(2));
+			codigoRepository.save(codigo);
+		});
+	}
+
 	private static String email() {
 		return UUID.randomUUID() + "@email.com";
 	}
@@ -132,11 +160,7 @@ class SegurancaIntegrationTest {
 	void loginSemNomeDeUsuarioCadastradoEnviaCodigoValido() throws Exception {
 		String email = email();
 		cadastrarELogar(email);
-		// Recua o pedido do cadastro para passar do intervalo minimo entre pedidos do mesmo email.
-		codigoRepository.findAll().stream().filter(codigo -> codigo.getEmail().equals(email)).forEach(codigo -> {
-			codigo.setCriadoEm(codigo.getCriadoEm().minusMinutes(2));
-			codigoRepository.save(codigo);
-		});
+		recuarPedidos(email);
 
 		solicitarCodigoSemNome(email).andExpect(status().isOk());
 		verificarCodigo(email, codigoAtual(email))
@@ -206,6 +230,101 @@ class SegurancaIntegrationTest {
 		String existente = solicitarCodigo(cadastrado, ip).andExpect(status().isTooManyRequests())
 				.andReturn().getResponse().getContentAsString();
 		assertThat(JsonPath.<String>read(existente, "$.detail")).isEqualTo(JsonPath.read(novo, "$.detail"));
+	}
+
+	// R-3, AC-14: mesma sequencia de respostas com e sem conta.
+	@Test
+	void limitePorEmailNaoRevelaSeOEmailTemConta() throws Exception {
+		String cadastrado = email();
+		cadastrarELogar(cadastrado);
+		recuarPedidos(cadastrado);
+		String semConta = email();
+
+		String corpoComConta = solicitarCodigoSemNome(cadastrado).andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		String corpoSemConta = solicitarCodigoSemNome(semConta).andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		assertThat(JsonPath.<String>read(corpoSemConta, "$.mensagem"))
+				.isEqualTo(JsonPath.read(corpoComConta, "$.mensagem"));
+
+		String recusaComConta = solicitarCodigoSemNome(cadastrado).andExpect(status().isTooManyRequests())
+				.andExpect(header().exists(HttpHeaders.RETRY_AFTER))
+				.andReturn().getResponse().getContentAsString();
+		String recusaSemConta = solicitarCodigoSemNome(semConta).andExpect(status().isTooManyRequests())
+				.andExpect(header().exists(HttpHeaders.RETRY_AFTER))
+				.andReturn().getResponse().getContentAsString();
+		assertThat(JsonPath.<Integer>read(recusaSemConta, "$.status"))
+				.isEqualTo(JsonPath.<Integer>read(recusaComConta, "$.status"));
+	}
+
+	// R-8, AC-16, AC-19
+	@Test
+	void pedidoComNomeLogoDepoisDePedidoSemContaRetorna429() throws Exception {
+		String email = email();
+		solicitarCodigoSemNome(email).andExpect(status().isOk());
+		assertThat(codigoRepository.findByEmailAndUtilizadoFalse(email)).isEmpty();
+
+		solicitarCodigo(email, ipAleatorio()).andExpect(status().isTooManyRequests());
+		assertThat(codigoRepository.findByEmailAndUtilizadoFalse(email)).isEmpty();
+		verify(emailService, after(200).never()).enviarCodigoOtp(eq(email), any());
+	}
+
+	// R-3, AC-20: 200 e 429, com e sem conta, nunca respondem antes do tempo minimo.
+	@Test
+	void respostasDoPedidoRespeitamOTempoMinimo() throws Exception {
+		String email = email();
+
+		for (int status : new int[] { 200, 429 }) {
+			long inicio = System.nanoTime();
+			solicitarCodigoSemNome(email).andExpect(status().is(status));
+			assertThat(Duration.ofNanos(System.nanoTime() - inicio)).isGreaterThanOrEqualTo(TempoMinimoResposta.MINIMO);
+		}
+	}
+
+	// R-11, AC-17: a resposta chega com o SMTP travado.
+	@Test
+	void respostaNaoEsperaOEnvioDoEmail() throws Exception {
+		String email = email();
+		CountDownLatch liberarSmtp = new CountDownLatch(1);
+		CountDownLatch envioConcluido = new CountDownLatch(1);
+		AtomicBoolean liberadoDepoisDaResposta = new AtomicBoolean();
+		doAnswer(chamada -> {
+			liberadoDepoisDaResposta.set(liberarSmtp.await(5, TimeUnit.SECONDS));
+			envioConcluido.countDown();
+			return null;
+		}).when(emailService).enviarCodigoOtp(eq(email), any());
+
+		solicitarCodigo(email, ipAleatorio()).andExpect(status().isOk());
+		liberarSmtp.countDown();
+
+		assertThat(envioConcluido.await(10, TimeUnit.SECONDS)).isTrue();
+		assertThat(liberadoDepoisDaResposta).isTrue();
+	}
+
+	// R-11, AC-11
+	@Test
+	void falhaNoEnvioDoEmailResponde200EMantemOCodigo() throws Exception {
+		String email = email();
+		doThrow(new EnvioEmailException("falhou", null)).when(emailService).enviarCodigoOtp(eq(email), any());
+
+		solicitarCodigo(email, ipAleatorio()).andExpect(status().isOk());
+
+		verify(emailService, timeout(5000)).enviarCodigoOtp(eq(email), any());
+		assertThat(codigoRepository.findByEmailAndUtilizadoFalse(email)).hasSize(1);
+	}
+
+	// R-11, AC-18
+	@Test
+	void transacaoDesfeitaNaoEnviaEmail() {
+		String email = email();
+
+		transactionTemplate.executeWithoutResult(transacao -> {
+			authService.solicitarCodigo(new SolicitarCodigoRequest("Maria Silva", email), ipAleatorio());
+			transacao.setRollbackOnly();
+		});
+
+		verify(emailService, after(200).never()).enviarCodigoOtp(eq(email), any());
+		assertThat(codigoRepository.findByEmailAndUtilizadoFalse(email)).isEmpty();
 	}
 
 	@Test

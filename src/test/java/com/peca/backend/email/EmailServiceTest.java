@@ -12,6 +12,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -48,6 +50,19 @@ class EmailServiceTest {
 		assertThatThrownBy(() -> service.enviarCodigoOtp("maria@email.com", "123456"))
 				.isInstanceOf(EnvioEmailException.class)
 				.hasCauseInstanceOf(MailSendException.class);
+	}
+
+	// R-11: o log registra a falha sem o destinatario, mesmo que a mensagem do SMTP o cite.
+	@Test
+	@ExtendWith(OutputCaptureExtension.class)
+	void falhaNoSmtpNaoDeveLevarODestinatarioParaOLog(CapturedOutput saida) {
+		doThrow(new MailSendException("550 <maria@email.com>: Recipient address rejected")).when(mailSender)
+				.send(any(SimpleMailMessage.class));
+
+		assertThatThrownBy(() -> service.enviarCodigoOtp("maria@email.com", "123456"))
+				.isInstanceOf(EnvioEmailException.class);
+
+		assertThat(saida).contains("Falha ao enviar codigo de acesso por email").doesNotContain("maria@email.com");
 	}
 
 }

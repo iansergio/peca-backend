@@ -47,7 +47,8 @@ public class EmailService {
 		try {
 			mailSender.send(mensagem);
 		} catch (MailException e) {
-			log.error("Falha ao enviar codigo de acesso por email", e);
+			// So o tipo: a mensagem do SMTP pode trazer o destinatario, que nunca vai para o log.
+			log.error("Falha ao enviar codigo de acesso por email: {}", e.getClass().getSimpleName());
 			throw new EnvioEmailException("Nao foi possivel enviar o codigo por email. Tente novamente mais tarde.", e);
 		}
 	}

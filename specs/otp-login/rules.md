@@ -14,8 +14,11 @@ Conta existente pede o código só com o email. Um `nome` enviado é ignorado e 
 
 ### R-3 — Não revelar se a conta existe (confirmed by the user on 2026-11-05)
 
-O pedido de código não pode revelar se o email tem conta. Hoje, email sem conta e sem `nome` responde
-200 igual a um envio real, sem gerar código. A regra ainda não vale em todos os casos: ver `D-1`.
+O pedido de código não pode revelar se o email tem conta: status, corpo, headers e limites são os mesmos,
+e o tempo de resposta não depende do envio do email. Toda resposta do pedido, sucesso ou 429, leva pelo
+menos 50 ms, para esconder a gravação do código; um pedido que passe disso por pico de carga não é
+compensado. Email sem conta e sem `nome` responde 200 igual a um
+envio real, sem gerar código e sem enviar email. O cadastro segue pelo pedido com `nome`.
 
 ## Código
 
@@ -40,8 +43,10 @@ Código errado, expirado, usado, bloqueado ou inexistente responde 401 com a mes
 ### R-8 — Limites de pedidos (observed)
 
 Por padrão: 60 s entre pedidos e 5 por hora para o mesmo email, e 20 por hora por IP, configuráveis em
-`app.otp.*`. O limite por IP é checado primeiro, em memória. Os limites por email contam os códigos
-gravados na última hora.
+`app.otp.*`. O limite por IP é checado primeiro, em memória. Os limites por email valem igualmente para
+emails com ou sem conta: contam os códigos gravados na última hora mais os pedidos sem conta e sem `nome`
+aceitos nessa janela. Esses pedidos ficam só em memória, sem o email em texto puro, e saem dela ao deixar a
+janela. Reiniciar a aplicação zera essa contagem.
 
 ### R-9 — Resposta ao exceder (observed)
 
@@ -58,7 +63,10 @@ O email tem o assunto "Seu código de acesso - PEÇA", o código e a validade. O
 
 ### R-11 — Falha no envio (observed)
 
-Se o envio falhar, a API responde 502 e o código é desfeito.
+O email é enviado depois do commit e fora da requisição, para login e cadastro. Se o envio falhar, a API já
+respondeu 200: a falha vai para o log, sem email nem código, e o código gravado continua no limite por
+email. A pessoa pede outro código pelo reenvio. Se a transação falhar, nada é enviado. O pedido de código
+não responde 502.
 
 ## Token
 
@@ -93,23 +101,21 @@ O reenvio fica travado por 60 s no front, valor fixo, ou pelo `Retry-After` rece
 
 ## Defeitos observados
 
-Comportamento registrado, não corrigido. Decida a correção antes de usar `/peca.fix`: `D-1`, `D-2` e
-`D-3` mudam regras críticas e pedem `/peca.go`.
+Comportamento registrado, não corrigido. Decida a correção antes de usar `/peca.fix`: `D-2` e `D-3`
+mudam regras críticas e pedem `/peca.go`.
 
-- `D-1`: **enumeração de contas** (classificado como defeito pelo usuário em 2026-11-05). Email sem conta
-  e sem `nome` nunca grava código, então nunca cai no limite por email. Dois pedidos seguidos dão 429
-  se a conta existe e sempre 200 se não existe. Conta existente também pode receber 502, e o tempo de
-  resposta difere porque só um caso envia email. O comentário em `AuthService.solicitarCodigo` afirma
-  o contrário. Ver P-1 em `docs/Architecture.md`.
 - `D-2`: **bloqueio de login de terceiros** (classificado como defeito pelo usuário em 2026-11-05).
   Qualquer pessoa pode fazer 5 pedidos por hora para o email de outra, que fica em 429 por até 1 hora e
-  recebe os emails. Cinco códigos errados também invalidam o código ativo dela.
+  recebe os emails. Cinco códigos errados também invalidam o código ativo dela. Para email sem conta, os
+  pedidos sem `nome` bloqueiam o cadastro sem enviar nada à vítima.
 - `D-3`: **sair não invalida o token** (classificado como defeito pelo usuário em 2026-11-05). `sair` só
   apaga os cookies. Um token copiado continua aceito até expirar, mesmo depois de remover a conta.
 - `D-4`: **limite por IP forjável.** A API usa o `X-Forwarded-For` de quem chama, e a porta 8080 fica
   publicada. Pela porta 3000, o Next preserva o header enviado pelo cliente (`??=` em `base-server`), e
   `ipDoVisitante` usa a entrada mais à direita; sem proxy reverso, ela vem do cliente. Conferido no
-  código, não em execução. Ver P-2.
+  código, não em execução. Ver P-2. Com IP forjado, os mapas em memória dos limites por IP e de pedidos sem
+  conta crescem sem teto por até 1 hora, e o tempo mínimo de `R-3` segura uma thread por 50 ms a cada pedido;
+  corrigir este item limita os dois efeitos.
 - `D-5`: **OTP em texto puro e sem expurgo.** `codigos_verificacao.codigo` não tem hash, e nenhuma rotina
   apaga códigos antigos. Ver P-5 e `Q-1`.
 - `D-6`: **`destinoSeguro` aceita tab e quebra de linha.** `/<TAB>/evil.example` passa pelo filtro, e o
@@ -118,11 +124,10 @@ Comportamento registrado, não corrigido. Decida a correção antes de usar `/pe
   login.
 - `D-7`: **códigos expostos no ambiente local.** O Mailpit na porta 8025 mostra os códigos a quem alcançar
   a porta. Ver P-3. O `JWT_SECRET` padrão versionado permite forjar tokens. Ver P-4.
-- `D-8`: **corridas no pedido de código.** Sem lock, pedidos simultâneos podem passar juntos pelo limite por
-  email. O SMTP roda dentro da transação, segurando a conexão do banco até o timeout, e uma falha no
-  commit depois do envio deixa um código que não funciona.
-- `D-9`: **limite por IP consome pedidos recusados.** Um pedido recusado pelo limite por email, ou com falha
-  no SMTP, gasta o limite por IP, que zera ao reiniciar. Ver P-15.
+- `D-8`: **corrida no pedido de código.** Sem lock, pedidos simultâneos podem passar juntos pelo limite por
+  email.
+- `D-9`: **limite por IP consome pedidos recusados.** Um pedido recusado pelo limite por email gasta o limite
+  por IP, que zera ao reiniciar. Ver P-15.
 - `D-10`: **valores repetidos.** Os 10 minutos estão em `AuthService`, `EmailService`, no Swagger e na tela.
   Os 60 s estão no front e no Swagger, embora sejam configuráveis na API. A descrição do 200 no Swagger
   diz "Codigo gerado e enviado" mesmo quando nada é enviado.

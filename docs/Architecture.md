@@ -41,7 +41,8 @@ navegador → peca-front-end (servidor Next, :3000) → peca-backend (/api, :808
 
 ### Integrações
 
-- Email por SMTP no `EmailService`; sem `MAIL_*`, vai para o Mailpit.
+- Email por SMTP no `EmailService`, depois do commit e em fila limitada, pelo `EnvioCodigoOtpListener`; sem
+  `MAIL_*`, vai para o Mailpit.
 - Fotos no disco pelo `ArmazenamentoImagemService`: JPEG, PNG ou WEBP de até 5 MB, com o tipo
   detectado pelo conteúdo do arquivo.
 - As integrações são classes concretas, sem interface de porta.
@@ -76,10 +77,8 @@ Nada abaixo foi corrigido. Cada item precisa de decisão e, quando virar mudanç
 
 ### Segurança e dados
 
-- **P-1: Enumeração de email pelo 429.** Email sem conta e sem nome nunca grava código, então nunca cai
-  no limite por email e responde sempre 200. Conta existente recebe 429 no segundo pedido dentro
-  de 60 s, e 502 se o envio falhar. O comentário em `AuthService.solicitarCodigo` afirma o
-  contrário. O tempo de resposta também difere, porque só um dos casos envia email.
+- **P-1: Enumeração de email.** Resolvido em 2026-11-05: ver `R-3`, `R-8` e `R-11` em
+  `specs/otp-login/rules.md`.
 - **P-2: Limite por IP contornável.** O `docker-compose.yml` publica a porta 8080, e a API aceita
   `X-Forwarded-For` de quem a chamar. Pela porta 3000, o Next preserva o header do cliente e o Compose
   não tem proxy reverso. Ver `D-4` em `specs/otp-login/rules.md`.
@@ -122,7 +121,8 @@ Nada abaixo foi corrigido. Cada item precisa de decisão e, quando virar mudanç
   erro de migration só aparece ao subir no PostgreSQL. O `application.properties` de teste também
   precisa ser mantido à mão.
 - **P-14: Lacunas de ferramentas.** Sem CI, sem testes no front, sem linter nem auditoria no backend.
-- **P-15: Limitador em memória.** O limite por IP zera ao reiniciar e vale por instância.
+- **P-15: Limitadores em memória.** O limite por IP e a contagem de pedidos sem conta zeram ao reiniciar e
+  valem por instância.
 - **P-16: Dependência circular entre pacotes.** `auth` usa `usuario`, e `usuario` e `peca` usam
   `auth.UsuarioAutenticado`.
 - **P-17: Documentos desatualizados.** O `ROADMAP.md` do backend ainda lista Supabase e Azure como

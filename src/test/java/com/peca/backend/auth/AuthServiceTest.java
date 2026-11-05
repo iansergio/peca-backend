@@ -3,9 +3,8 @@ package com.peca.backend.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -13,8 +12,7 @@ import com.peca.backend.auth.dto.SolicitarCodigoRequest;
 import com.peca.backend.auth.dto.SolicitarCodigoResponse;
 import com.peca.backend.auth.dto.TokenResponse;
 import com.peca.backend.auth.dto.VerificarCodigoRequest;
-import com.peca.backend.email.EmailService;
-import com.peca.backend.email.EnvioEmailException;
+import com.peca.backend.email.CodigoOtpSolicitado;
 import com.peca.backend.exception.LimiteExcedidoException;
 import com.peca.backend.usuario.Usuario;
 import com.peca.backend.usuario.UsuarioRepository;
@@ -38,6 +36,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -58,7 +57,7 @@ class AuthServiceTest {
 	private UsuarioService usuarioService;
 
 	@Mock
-	private EmailService emailService;
+	private ApplicationEventPublisher eventos;
 
 	private final SecurityConfig config = new SecurityConfig();
 	private final SecretKey chave = new SecretKeySpec(
@@ -67,13 +66,18 @@ class AuthServiceTest {
 
 	private final OtpProperties otpProperties = new OtpProperties(Duration.ofSeconds(60), 5, 20);
 	private final Clock clock = Clock.fixed(AGORA, ZoneOffset.UTC);
+	private final LimitadorPedidosSemConta limitadorSemConta = new LimitadorPedidosSemConta(clock);
 	private AuthService service;
 
 	@BeforeEach
 	void setUp() {
-		service = new AuthService(usuarioRepository, usuarioService, codigoRepository, config.jwtEncoder(chave),
-				emailService, new JwtProperties("ignorado", Duration.ofHours(2)), otpProperties,
-				new LimitadorSolicitacoesPorIp(otpProperties, clock), clock);
+		service = serviceEm(clock);
+	}
+
+	private AuthService serviceEm(Clock relogio) {
+		return new AuthService(usuarioRepository, usuarioService, codigoRepository, config.jwtEncoder(chave),
+				eventos, new JwtProperties("ignorado", Duration.ofHours(2)), otpProperties,
+				new LimitadorSolicitacoesPorIp(otpProperties, relogio), limitadorSemConta, relogio);
 	}
 
 	private SolicitarCodigoResponse solicitar(String nome, String email) {
@@ -82,14 +86,18 @@ class AuthServiceTest {
 
 	// Pedidos anteriores do email, criados ha N segundos (do mais antigo para o mais novo).
 	private void pedidosAnteriores(long... segundosAtras) {
+		when(codigoRepository.findByEmailAndCriadoEmAfterOrderByCriadoEmAsc("maria@email.com", AGORA_LOCAL.minusHours(1)))
+				.thenReturn(codigosCriadosHa(segundosAtras));
+	}
+
+	private static List<CodigoVerificacao> codigosCriadosHa(long... segundosAtras) {
 		List<CodigoVerificacao> recentes = new ArrayList<>();
 		for (long segundos : segundosAtras) {
 			CodigoVerificacao codigo = new CodigoVerificacao();
 			codigo.setCriadoEm(AGORA_LOCAL.minusSeconds(segundos));
 			recentes.add(codigo);
 		}
-		when(codigoRepository.findByEmailAndCriadoEmAfterOrderByCriadoEmAsc("maria@email.com", AGORA_LOCAL.minusHours(1)))
-				.thenReturn(recentes);
+		return recentes;
 	}
 
 	private static Usuario usuario(UUID id) {
@@ -128,7 +136,7 @@ class AuthServiceTest {
 		assertThat(codigo.getValue().getExpiraEm()).isEqualTo(AGORA_LOCAL.plusMinutes(10));
 		assertThat(codigo.getValue().isUtilizado()).isFalse();
 		assertThat(response.expiraEm()).isEqualTo(AGORA_LOCAL.plusMinutes(10));
-		verify(emailService).enviarCodigoOtp("maria@email.com", codigo.getValue().getCodigo());
+		verify(eventos).publishEvent(new CodigoOtpSolicitado("maria@email.com", codigo.getValue().getCodigo()));
 	}
 
 	@Test
@@ -142,7 +150,7 @@ class AuthServiceTest {
 		verify(codigoRepository).save(codigo.capture());
 		assertThat(codigo.getValue().getUsuario()).isSameAs(existente);
 		assertThat(codigo.getValue().getNome()).isNull();
-		verify(emailService).enviarCodigoOtp("maria@email.com", codigo.getValue().getCodigo());
+		verify(eventos).publishEvent(new CodigoOtpSolicitado("maria@email.com", codigo.getValue().getCodigo()));
 	}
 
 	@Test
@@ -154,17 +162,64 @@ class AuthServiceTest {
 		assertThat(response.mensagem()).isEqualTo("Codigo enviado para o email informado");
 		assertThat(response.expiraEm()).isEqualTo(AGORA_LOCAL.plusMinutes(10));
 		verify(codigoRepository, never()).save(any());
-		verify(emailService, never()).enviarCodigoOtp(any(), any());
+		verify(eventos, never()).publishEvent(any(Object.class));
 	}
 
+	// R-3, R-8, AC-14
 	@Test
-	void falhaNoEnvioDoEmailDevePropagarErro() {
-		Usuario existente = usuario(UUID.randomUUID());
-		when(usuarioRepository.findByEmail("maria@email.com")).thenReturn(Optional.of(existente));
-		doThrow(new EnvioEmailException("falhou", null)).when(emailService).enviarCodigoOtp(any(), any());
+	void segundoPedidoSemContaDentroDoIntervaloRetornaLimite() {
+		solicitar(null, "maria@email.com");
 
-		assertThatThrownBy(() -> solicitar("Outro Nome", "maria@email.com"))
-				.isInstanceOf(EnvioEmailException.class);
+		assertThatThrownBy(() -> solicitar(null, "maria@email.com"))
+				.isInstanceOf(LimiteExcedidoException.class)
+				.extracting("segundosParaNovaTentativa").isEqualTo(60L);
+	}
+
+	// R-8, AC-15
+	@Test
+	void sextoPedidoSemContaNaHoraRetornaLimite() {
+		for (int i = 0; i < 5; i++) {
+			limitadorSemConta.registrar("maria@email.com");
+		}
+		AuthService depoisDoIntervalo = serviceEm(Clock.fixed(AGORA.plusSeconds(120), ZoneOffset.UTC));
+
+		assertThatThrownBy(() -> depoisDoIntervalo.solicitarCodigo(
+				new SolicitarCodigoRequest(null, "maria@email.com"), "203.0.113.10"))
+				.isInstanceOf(LimiteExcedidoException.class)
+				.extracting("segundosParaNovaTentativa").isEqualTo(3480L);
+	}
+
+	// R-8, AC-16
+	@Test
+	void pedidoComNomeLogoDepoisDePedidoSemContaRetornaLimiteSemGerarCodigo() {
+		solicitar(null, "maria@email.com");
+
+		assertThatThrownBy(() -> solicitar("Maria Silva", "maria@email.com"))
+				.isInstanceOf(LimiteExcedidoException.class);
+		verify(codigoRepository, never()).save(any());
+		verify(eventos, never()).publishEvent(any(Object.class));
+	}
+
+	// R-8: pedidos gravados e em memoria somam no mesmo limite por hora.
+	@Test
+	void limitePorHoraSomaCodigosGravadosEPedidosSemConta() {
+		limitadorSemConta.registrar("maria@email.com");
+		AuthService depoisDoIntervalo = serviceEm(Clock.fixed(AGORA.plusSeconds(120), ZoneOffset.UTC));
+		when(codigoRepository.findByEmailAndCriadoEmAfterOrderByCriadoEmAsc("maria@email.com",
+				AGORA_LOCAL.plusSeconds(120).minusHours(1))).thenReturn(codigosCriadosHa(3000, 2400, 1800, 1200));
+
+		assertThatThrownBy(() -> depoisDoIntervalo.solicitarCodigo(
+				new SolicitarCodigoRequest(null, "maria@email.com"), "203.0.113.10"))
+				.isInstanceOf(LimiteExcedidoException.class);
+	}
+
+	// R-8: o pedido recusado nao conta de novo.
+	@Test
+	void pedidoSemContaRecusadoNaoRegistraOutroPedido() {
+		solicitar(null, "maria@email.com");
+		assertThatThrownBy(() -> solicitar(null, "maria@email.com")).isInstanceOf(LimiteExcedidoException.class);
+
+		assertThat(limitadorSemConta.pedidosRecentes("maria@email.com")).hasSize(1);
 	}
 
 	@Test
@@ -193,7 +248,7 @@ class AuthServiceTest {
 				.isInstanceOf(LimiteExcedidoException.class)
 				.extracting("segundosParaNovaTentativa").isEqualTo(40L);
 		verify(codigoRepository, never()).save(any());
-		verify(emailService, never()).enviarCodigoOtp(any(), any());
+		verify(eventos, never()).publishEvent(any(Object.class));
 	}
 
 	@Test
@@ -203,7 +258,7 @@ class AuthServiceTest {
 
 		solicitar("Maria Silva", "maria@email.com");
 
-		verify(emailService).enviarCodigoOtp(eq("maria@email.com"), any());
+		verify(eventos).publishEvent(any(CodigoOtpSolicitado.class));
 	}
 
 	@Test
@@ -215,7 +270,7 @@ class AuthServiceTest {
 				.isInstanceOf(LimiteExcedidoException.class)
 				.extracting("segundosParaNovaTentativa").isEqualTo(600L);
 		verify(codigoRepository, never()).save(any());
-		verify(emailService, never()).enviarCodigoOtp(any(), any());
+		verify(eventos, never()).publishEvent(any(Object.class));
 	}
 
 	@Test
@@ -225,7 +280,7 @@ class AuthServiceTest {
 
 		solicitar("Maria Silva", "maria@email.com");
 
-		verify(emailService).enviarCodigoOtp(eq("maria@email.com"), any());
+		verify(eventos).publishEvent(any(CodigoOtpSolicitado.class));
 	}
 
 	@Test
@@ -237,7 +292,7 @@ class AuthServiceTest {
 
 		assertThatThrownBy(() -> solicitar("Maria Silva", "outra@email.com"))
 				.isInstanceOf(LimiteExcedidoException.class);
-		verify(emailService, never()).enviarCodigoOtp(eq("outra@email.com"), any());
+		verify(codigoRepository, times(20)).save(any());
 	}
 
 	@Test

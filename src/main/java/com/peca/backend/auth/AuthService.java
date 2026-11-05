@@ -4,7 +4,7 @@ import com.peca.backend.auth.dto.SolicitarCodigoRequest;
 import com.peca.backend.auth.dto.SolicitarCodigoResponse;
 import com.peca.backend.auth.dto.TokenResponse;
 import com.peca.backend.auth.dto.VerificarCodigoRequest;
-import com.peca.backend.email.EmailService;
+import com.peca.backend.email.CodigoOtpSolicitado;
 import com.peca.backend.exception.LimiteExcedidoException;
 import com.peca.backend.usuario.Usuario;
 import com.peca.backend.usuario.UsuarioRepository;
@@ -18,7 +18,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
@@ -38,33 +40,36 @@ public class AuthService {
 	private final UsuarioService usuarioService;
 	private final CodigoVerificacaoRepository codigoRepository;
 	private final JwtEncoder jwtEncoder;
-	private final EmailService emailService;
+	private final ApplicationEventPublisher eventos;
 	private final JwtProperties properties;
 	private final OtpProperties otpProperties;
 	private final LimitadorSolicitacoesPorIp limitadorPorIp;
+	private final LimitadorPedidosSemConta limitadorSemConta;
 	private final Clock clock;
 	private final SecureRandom random = new SecureRandom();
 
 	@Autowired
 	public AuthService(UsuarioRepository usuarioRepository, UsuarioService usuarioService,
-			CodigoVerificacaoRepository codigoRepository, JwtEncoder jwtEncoder, EmailService emailService,
-			JwtProperties properties, OtpProperties otpProperties, LimitadorSolicitacoesPorIp limitadorPorIp) {
-		this(usuarioRepository, usuarioService, codigoRepository, jwtEncoder, emailService, properties, otpProperties,
-				limitadorPorIp, Clock.systemUTC());
+			CodigoVerificacaoRepository codigoRepository, JwtEncoder jwtEncoder, ApplicationEventPublisher eventos,
+			JwtProperties properties, OtpProperties otpProperties, LimitadorSolicitacoesPorIp limitadorPorIp,
+			LimitadorPedidosSemConta limitadorSemConta) {
+		this(usuarioRepository, usuarioService, codigoRepository, jwtEncoder, eventos, properties, otpProperties,
+				limitadorPorIp, limitadorSemConta, Clock.systemUTC());
 	}
 
 	AuthService(UsuarioRepository usuarioRepository, UsuarioService usuarioService,
-			CodigoVerificacaoRepository codigoRepository, JwtEncoder jwtEncoder, EmailService emailService,
+			CodigoVerificacaoRepository codigoRepository, JwtEncoder jwtEncoder, ApplicationEventPublisher eventos,
 			JwtProperties properties, OtpProperties otpProperties, LimitadorSolicitacoesPorIp limitadorPorIp,
-			Clock clock) {
+			LimitadorPedidosSemConta limitadorSemConta, Clock clock) {
 		this.usuarioRepository = usuarioRepository;
 		this.usuarioService = usuarioService;
 		this.codigoRepository = codigoRepository;
 		this.jwtEncoder = jwtEncoder;
-		this.emailService = emailService;
+		this.eventos = eventos;
 		this.properties = properties;
 		this.otpProperties = otpProperties;
 		this.limitadorPorIp = limitadorPorIp;
+		this.limitadorSemConta = limitadorSemConta;
 		this.clock = clock;
 	}
 
@@ -83,7 +88,9 @@ public class AuthService {
 		boolean semNome = request.nome() == null || request.nome().isBlank();
 		if (usuario == null && semNome) {
 			// Login de um email sem conta: sem nome nao ha como cadastrar, entao nenhum codigo e gerado nem
-			// enviado. A resposta e a mesma de um envio real para nao revelar se o email esta cadastrado.
+			// enviado. O pedido conta no limite por email, e a resposta e a mesma de um envio real, para nao
+			// revelar se o email esta cadastrado.
+			limitadorSemConta.registrar(email);
 			return new SolicitarCodigoResponse(MENSAGEM_ENVIADO, agora.plus(VALIDADE_CODIGO));
 		}
 
@@ -101,29 +108,37 @@ public class AuthService {
 		codigo.setExpiraEm(agora.plus(VALIDADE_CODIGO));
 		codigoRepository.save(codigo);
 
-		// Dentro da transacao: se o envio falhar, o codigo e desfeito.
-		emailService.enviarCodigoOtp(email, codigo.getCodigo());
+		// O envio acontece depois do commit e fora da requisicao: ver EnvioCodigoOtpListener.
+		eventos.publishEvent(new CodigoOtpSolicitado(email, codigo.getCodigo()));
 		return new SolicitarCodigoResponse(MENSAGEM_ENVIADO, codigo.getExpiraEm());
 	}
 
 	// Cooldown entre pedidos e limite por hora do mesmo email. Com 5 codigos/hora e 5 tentativas
 	// por codigo, um email aceita no maximo 25 chutes por hora.
 	private void exigirDentroDoLimite(String email, LocalDateTime agora) {
-		List<CodigoVerificacao> recentes = codigoRepository
-				.findByEmailAndCriadoEmAfterOrderByCriadoEmAsc(email, agora.minus(OtpProperties.JANELA));
+		List<LocalDateTime> recentes = pedidosRecentes(email, agora);
 		if (recentes.isEmpty()) {
 			return;
 		}
-		LocalDateTime liberaPorIntervalo = recentes.getLast().getCriadoEm().plus(otpProperties.intervaloEntrePedidos());
+		LocalDateTime liberaPorIntervalo = recentes.getLast().plus(otpProperties.intervaloEntrePedidos());
 		if (agora.isBefore(liberaPorIntervalo)) {
 			throw new LimiteExcedidoException(Duration.between(agora, liberaPorIntervalo));
 		}
 		int excedentes = recentes.size() - otpProperties.maxPedidosPorHoraEmail();
 		if (excedentes >= 0) {
 			// Libera quando o pedido que estourou o limite sair da janela.
-			LocalDateTime liberaPorHora = recentes.get(excedentes).getCriadoEm().plus(OtpProperties.JANELA);
+			LocalDateTime liberaPorHora = recentes.get(excedentes).plus(OtpProperties.JANELA);
 			throw new LimiteExcedidoException(Duration.between(agora, liberaPorHora));
 		}
+	}
+
+	// Codigos gravados mais pedidos de emails sem conta, do mais antigo para o mais novo. Somar os dois vale
+	// tambem para email com conta: um pedido sem conta seguido de um com nome nao pode escapar do limite.
+	private List<LocalDateTime> pedidosRecentes(String email, LocalDateTime agora) {
+		Stream<LocalDateTime> gravados = codigoRepository
+				.findByEmailAndCriadoEmAfterOrderByCriadoEmAsc(email, agora.minus(OtpProperties.JANELA)).stream()
+				.map(CodigoVerificacao::getCriadoEm);
+		return Stream.concat(gravados, limitadorSemConta.pedidosRecentes(email).stream()).sorted().toList();
 	}
 
 	// noRollbackFor: o incremento de tentativas precisa ser gravado mesmo quando o codigo esta errado.
