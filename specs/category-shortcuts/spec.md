@@ -34,6 +34,7 @@ horizontal e o toque continua com 44 px de altura.
 - `AC-3`: os atalhos Telas, Câmeras e Placas filtram os mesmos valores de antes.
 - `AC-4`: o grid da home e o select do formulário de anúncio continuam com todas as categorias.
 - `AC-5`: `/pecas?categoria=baterias`, `peliculas` e `acessorios` continuam filtrando pela categoria.
+- `AC-6`: em `/pecas?categoria=carcacas`, o atalho Carcaças fica destacado, com `aria-current="page"`.
 
 ## Casos de borda
 
