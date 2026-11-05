@@ -81,9 +81,8 @@ Nada abaixo foi corrigido. Cada item precisa de decisão e, quando virar mudanç
   de 60 s, e 502 se o envio falhar. O comentário em `AuthService.solicitarCodigo` afirma o
   contrário. O tempo de resposta também difere, porque só um dos casos envia email.
 - **P-2: Limite por IP contornável.** O `docker-compose.yml` publica a porta 8080, e a API aceita
-  `X-Forwarded-For` de quem a chamar, como já avisa o `application.properties`. A confirmar: o
-  front lê a entrada mais à direita desse header e o Compose não tem proxy reverso, então um
-  cliente também pode conseguir forjá-lo pela porta 3000.
+  `X-Forwarded-For` de quem a chamar. Pela porta 3000, o Next preserva o header do cliente e o Compose
+  não tem proxy reverso. Ver `D-4` em `specs/otp-login/rules.md`.
 - **P-3: Portas abertas na rede local.** PostgreSQL (com padrão `peca`/`peca`), Mailpit e API são
   publicados em todas as interfaces. No Mailpit, os códigos OTP ficam legíveis para quem alcançar
   a porta 8025, o que permite entrar na conta de outra pessoa.
@@ -99,6 +98,10 @@ Nada abaixo foi corrigido. Cada item precisa de decisão e, quando virar mudanç
   `IOException` para a resposta 500, o que pode revelar caminhos do servidor.
 - **P-8: Swagger público.** A UI e `/v3/api-docs` ficam abertos em qualquer ambiente, por decisão ou por
   padrão; falta confirmar.
+- **P-19: Sessão e bloqueio de login.** Sair não invalida o JWT, e qualquer pessoa pode bloquear o login
+  de outra. Ver `D-2` e `D-3` em `specs/otp-login/rules.md`.
+- **P-20: Redirecionamento depois do login.** `destinoSeguro` aceita tab e quebra de linha. Ver `D-6` em
+  `specs/otp-login/rules.md`.
 
 ### Consistência e contrato
 
