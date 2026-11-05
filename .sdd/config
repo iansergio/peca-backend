@@ -1,0 +1,10 @@
+# sdd project config — read by .sdd/sdd and by /peca.update
+SDD_TEMPLATE_REPO=https://github.com/emersonmendes/sdd.git
+SDD_PREFIX=peca
+SDD_PROJECT_NAME="PEÇA"
+SDD_LANGUAGE=Português (Brasil)
+SDD_MODEL_IMPLEMENT=sonnet
+SDD_MODEL_LEAD=opus
+SDD_SKILLS="start tasks code review security go express fix ask reverse commit update screen"
+SDD_TEMPLATE_REF=3b1a2baefa29dd00253bc504fb79103b75be2000
+SDD_TEMPLATE_VERSION=v0.3.0

@@ -37,3 +37,18 @@ build/
 
 ### Imagens gravadas localmente (STORAGE_DIR padrao) ###
 dados/
+
+### Segredos e arquivos sensiveis (linha de base do SDD, ver ai/conventions.md) ###
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.tfstate
+*.dump
+*.sqlite*
+*.har
+*.log
