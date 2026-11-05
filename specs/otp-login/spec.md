@@ -1,6 +1,6 @@
 # Login por OTP
 
-Status: reverse-engineered from code on 2026-11-05
+Status: reverse-engineered from code on 2026-11-05; `R-3`, `R-8` e `R-11` corrigidas em 2026-11-05
 
 Descreve o que o sistema faz hoje. Comportamento considerado errado está em
 [`rules.md`](rules.md#defeitos-observados), não aqui como requisito.
@@ -30,7 +30,7 @@ limites (`R-8` e `R-9`), email (`R-10` e `R-11`), token (`R-12` a `R-14`) e tela
 
 | Método e caminho | Acesso | Sucesso | Erros |
 |---|---|---|---|
-| `POST /api/auth/solicitar-codigo` | Público | 200, com `mensagem` e `expiraEm` | 400, 429 com `Retry-After`, 502 |
+| `POST /api/auth/solicitar-codigo` | Público | 200, com `mensagem` e `expiraEm` | 400, 429 com `Retry-After` |
 | `POST /api/auth/verificar-codigo` | Público | 200, com `token`, `tipo`, `expiraEm` e `usuario` | 400, 401 |
 
 - `solicitar-codigo` recebe `email` e, opcionalmente, `nome`.
@@ -52,13 +52,15 @@ limites (`R-8` e `R-9`), email (`R-10` e `R-11`), token (`R-12` a `R-14`) e tela
 
 ## Requisitos não funcionais
 
-- **Dados pessoais:** email e nome, em `usuarios` e `codigos_verificacao`; o IP fica só em memória.
+- **Dados pessoais:** email e nome, em `usuarios` e `codigos_verificacao`; o IP fica só em memória. Pedidos
+  sem conta ficam em memória por até 1 hora, só como digest do email com salt.
   O email vai como claim no JWT.
-- **Consistência:** pedir o código roda em uma transação; se o envio falhar, o código é desfeito.
+- **Consistência:** pedir o código roda em uma transação. O email sai depois do commit, em fila limitada
+  fora da requisição; falha no envio não desfaz o código (`R-11`).
   Validar código persiste as tentativas mesmo quando recusa.
 - **Concorrência:** a validação bloqueia o código com lock pessimista.
-- **Testes:** `AuthServiceTest`, `SegurancaIntegrationTest`, `LimitadorSolicitacoesPorIpTest` e
-  `EmailServiceTest`. Nenhum teste cobre os casos de `D-1`. O front não tem testes.
+- **Testes:** `AuthServiceTest`, `SegurancaIntegrationTest`, `LimitadorSolicitacoesPorIpTest`,
+  `LimitadorPedidosSemContaTest`, `TempoMinimoRespostaTest`, `EmailServiceTest`, `EnvioCodigoOtpListenerTest` e `AsyncConfigTest`. O front não tem testes.
 
 ## Critérios de aceite
 
@@ -75,9 +77,18 @@ Descrevem o comportamento atual.
 - `AC-9`: novo pedido antes de 60 s responde 429 com `Retry-After`, sem gerar código, e o anterior
   continua válido.
 - `AC-10`: passar de 5 pedidos por hora por email, ou de 20 por IP, responde 429.
-- `AC-11`: falha no envio do email responde 502 e não mantém o código.
+- `AC-11`: falha no envio do email responde 200, registra a falha no log e mantém o código gravado.
 - `AC-12`: `JWT_SECRET` com menos de 32 bytes impede a aplicação de iniciar.
 - `AC-13`: `POST /api/auth/login` não existe e responde 401.
+- `AC-14`: dois pedidos sem `nome` para um email sem conta, em menos de 60 s, respondem 200 e depois 429
+  com `Retry-After`, igual a um email com conta.
+- `AC-15`: o sexto pedido em uma hora para um email sem conta, respeitado o intervalo, responde 429.
+- `AC-16`: um pedido sem `nome` seguido de um pedido com `nome` em menos de 60 s responde 429, com ou sem
+  conta, e não gera código nem envia email.
+- `AC-17`: a resposta do pedido não espera o SMTP: com o envio travado, ela chega assim mesmo.
+- `AC-18`: se a transação do pedido falhar, nenhum email é enviado.
+- `AC-19`: pedidos sem conta e sem `nome` não gravam nada no banco e não enviam email.
+- `AC-20`: toda resposta do pedido, 200 ou 429, com ou sem conta, leva pelo menos 50 ms.
 
 ## Casos de borda
 
@@ -87,6 +98,11 @@ Descrevem o comportamento atual.
 - **Código com zeros à esquerda:** é aceito, porque o código é texto de 6 dígitos.
 - **Conta removida:** os códigos dela somem junto, por `ON DELETE CASCADE`.
 - **Sessão ativa:** quem está logado não vê `/login`.
+- **Sem conta indo para o cadastro:** quem tenta entrar sem conta e abre "Criar conta" logo depois recebe 429
+  e espera até 60 s. É efeito aceito de `R-3`.
+- **Reinício da aplicação:** os pedidos sem conta em memória são perdidos, assim como os emails na fila. O
+  código gravado continua valendo, e a pessoa pede outro pelo reenvio.
+- **Fila de envio cheia:** o pedido responde 200 e a falha vai para o log, como em `R-11`.
 
 ## Fora do escopo
 

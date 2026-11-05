@@ -64,7 +64,7 @@ with `JAVA_HOME=/usr/lib/jvm/java-25-openjdk`. Local URLs: front `:3000`, Swagge
   paths. Internal errors are logged with context but without secrets or personal data.
 - API errors `(observed)`: RFC 9457 `ProblemDetail` from `exception/GlobalExceptionHandler`. Each
   case has a dedicated exception mapped there: 400, 401, 403, 404, 409, 413, 429 with `Retry-After`,
-  500, 502. Request validation uses Bean Validation on DTO records with `@Valid`.
+  500. Request validation uses Bean Validation on DTO records with `@Valid`.
 - Front `(observed)`: `lib/api/*` turns statuses into user messages (`ErroApi`, `ErroLimite`) or
   result objects (`{ ok: false, erro }`). Read-side functions never throw, so pages render a
   friendly state.

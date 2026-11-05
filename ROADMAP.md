@@ -38,6 +38,7 @@
 - [x] Proteger endpoints de escrita com JWT (apenas os endpoints de OTP e a leitura de peças são públicos).
 - [x] Usar o usuário do token como vendedor e restringir edição/exclusão/upload ao próprio dono.
 - [-] Limitar `POST /api/auth/solicitar-codigo` (60 s entre pedidos e 5 por hora por email, 20 por hora por IP; configurável em `app.otp.*`), respondendo 429 com `Retry-After`, e criar o usuário só ao validar o código (substitui o cadastro no momento do pedido).
+- [-] Não revelar se o email tem conta no pedido de código: limite por email igual com ou sem conta (pedidos sem conta só em memória) envio do email depois do commit, fora da requisição, e tempo mínimo de 50 ms em toda resposta. `POST /api/auth/solicitar-codigo` deixa de responder 502.
 
 ## Fase 6: Container e integração com o front
 - [-] CORS configurável por ambiente (`CORS_ALLOWED_ORIGINS`), com preflight sem token e `Retry-After`/`Location` expostos. Opcional: o front Next.js chama a API pelo servidor e não depende de CORS.

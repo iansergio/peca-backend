@@ -5,8 +5,9 @@ Where each type of code belongs. **Consult this file before touching any module.
 Two repositories, side by side. `peca-front-end` is the only client of `peca-backend`: Server
 Components, Server Actions and route handlers call the REST API from the Next server, with the
 JWT read from an httpOnly cookie. The browser never reaches the API, so photos go through the
-front's `/imagens` route too. Specs, docs and `docker-compose.yml` live in `peca-backend`. There
-are no async workers, queues, payments or admin area by decision until a spec adds them.
+front's `/imagens` route too. Specs, docs and `docker-compose.yml` live in `peca-backend`. The only
+async work is the OTP email, on the bounded in-process executor in `config/AsyncConfig`. There are
+no external queues, payments or admin area by decision until a spec adds them.
 
 ## Repositories / apps
 
