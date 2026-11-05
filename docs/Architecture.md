@@ -107,11 +107,11 @@ Nada abaixo foi corrigido. Cada item precisa de decisão e, quando virar mudanç
   existe mais. Em `enviarImagem`, o arquivo novo também fica órfão.
 - **P-10: Listagem sem paginação.** `GET /api/pecas` devolve tudo. O front filtra busca, categoria e
   "Meus anúncios" na própria memória, com a lista inteira, inclusive o WhatsApp de todos.
-- **P-11: Categoria sem contrato.** A API aceita texto livre, mas o front só filtra por uma lista fixa em
-  `components/vitrine/categorias.ts`. Um anúncio feito direto pela API pode não aparecer em
-  nenhuma categoria. `condicao` existe só no tipo do front.
+- **P-11: Categoria sem contrato.** A lista fixa de `components/vitrine/categorias.ts` é a oficial, mas a
+  API aceita texto livre. Ver `R-5` e `D-3` em `specs/listing-management/rules.md`. `condicao` existe só
+  no tipo do front.
 - **P-12: Anúncio sobrescreve o perfil.** Criar ou editar anúncio troca `usuarios.whatsapp`, afetando
-  todos os anúncios da pessoa. Falta confirmar se é a intenção.
+  todos os anúncios da pessoa. É intencional: ver `R-4` em `specs/listing-management/rules.md`.
 
 ### Qualidade e manutenção
 
